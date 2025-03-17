@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { 
   Container, 
@@ -13,32 +12,50 @@ import {
 } from '@mui/material';
 import ProductCard from '../components/ProductCard';
 import SearchBar from '../components/SearchBar';
-import { products, getMoreProducts, searchProducts, Product } from '../data/products';
+import { Product, fetchProducts, getMoreProducts, searchProducts } from '../data/products';
 
 const Home = () => {
   const [displayedProducts, setDisplayedProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searchResults, setSearchResults] = useState<Product[] | null>(null);
   const [isSearchMode, setIsSearchMode] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Initialize with some products
-    setDisplayedProducts(products.slice(0, 8));
+    // Initialize with products from the server
+    const getInitialProducts = async () => {
+      setIsLoading(true);
+      try {
+        const initialProducts = await fetchProducts();
+        setDisplayedProducts(initialProducts.slice(0, 8));
+        setError(null);
+      } catch (err) {
+        console.error('Failed to fetch initial products:', err);
+        setError('Failed to load products. Please try again later.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    getInitialProducts();
   }, []);
 
   const handleLoadMore = async () => {
-    setIsLoading(true);
+    setLoadingMore(true);
     try {
       const newProducts = await getMoreProducts(4);
       setDisplayedProducts([...displayedProducts, ...newProducts]);
-    } catch (error) {
-      console.error('Error loading more products:', error);
+      setError(null);
+    } catch (err) {
+      console.error('Error loading more products:', err);
+      setError('Failed to load more products. Please try again later.');
     } finally {
-      setIsLoading(false);
+      setLoadingMore(false);
     }
   };
 
-  const handleSearch = (query: string) => {
+  const handleSearch = async (query: string) => {
     if (query.trim() === '') {
       setIsSearchMode(false);
       setSearchResults(null);
@@ -46,8 +63,19 @@ const Home = () => {
     }
     
     setIsSearchMode(true);
-    const results = searchProducts(query);
-    setSearchResults(results);
+    setIsLoading(true);
+    
+    try {
+      const results = await searchProducts(query);
+      setSearchResults(results);
+      setError(null);
+    } catch (err) {
+      console.error('Error searching products:', err);
+      setError('Failed to search products. Please try again later.');
+      setSearchResults([]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleImageSearch = (results: Product[]) => {
@@ -76,7 +104,13 @@ const Home = () => {
 
       <SearchBar onSearch={handleSearch} onImageSearch={handleImageSearch} />
       
-      {isSearchMode && (
+      {error && (
+        <Alert severity="error" sx={{ mb: 4 }}>
+          {error}
+        </Alert>
+      )}
+
+      {isSearchMode && !isLoading && (
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h6">
             {searchResults?.length === 0 
@@ -89,12 +123,18 @@ const Home = () => {
         </Box>
       )}
 
-      {isSearchMode && searchResults?.length === 0 ? (
+      {isLoading && (
+        <Box display="flex" justifyContent="center" my={6}>
+          <CircularProgress />
+        </Box>
+      )}
+
+      {!isLoading && isSearchMode && searchResults?.length === 0 ? (
         <Alert severity="info" sx={{ mb: 4 }}>
           No products match your search criteria. Try different keywords or browse our catalog.
         </Alert>
       ) : (
-        <Fade in={true} timeout={500}>
+        <Fade in={!isLoading} timeout={500}>
           <Grid container spacing={3}>
             {productsToDisplay.map((product) => (
               <Grid item key={product.id} xs={12} sm={6} md={4} lg={3}>
@@ -105,17 +145,17 @@ const Home = () => {
         </Fade>
       )}
       
-      {!isSearchMode && (
+      {!isLoading && !isSearchMode && (
         <Box display="flex" justifyContent="center" mt={6} mb={4}>
           <Button 
             variant="contained" 
             color="primary" 
             onClick={handleLoadMore}
-            disabled={isLoading}
+            disabled={loadingMore}
             size="large"
             sx={{ px: 4, py: 1 }}
           >
-            {isLoading ? (
+            {loadingMore ? (
               <>
                 <CircularProgress size={24} color="inherit" sx={{ mr: 1 }} />
                 Loading...

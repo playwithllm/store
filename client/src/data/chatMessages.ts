@@ -1,3 +1,7 @@
+import axios from 'axios';
+
+// API base URL from environment variables with fallback
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 export interface ChatMessage {
   id: string;
@@ -36,3 +40,33 @@ export const initialMessages: ChatMessage[] = [
     timestamp: new Date(Date.now() - 60000)
   }
 ];
+
+// Function to fetch chat history from the server
+export const fetchChatHistory = async (): Promise<ChatMessage[]> => {
+  try {
+    const response = await axios.get(`${API_URL}/chat/history`);
+    
+    if (response.data.success) {
+      return response.data.messages || initialMessages;
+    }
+    return initialMessages;
+  } catch (error) {
+    console.error('Error fetching chat history:', error);
+    return initialMessages;
+  }
+};
+
+// Function to send a message to the server
+export const sendMessage = async (message: string): Promise<ChatMessage | null> => {
+  try {
+    const response = await axios.post(`${API_URL}/chat/message`, { message });
+    
+    if (response.data.success) {
+      return response.data.message;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error sending message:', error);
+    return null;
+  }
+};

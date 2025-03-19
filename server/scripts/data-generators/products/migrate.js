@@ -15,7 +15,7 @@ const CONFIG = {
   },
   batch: {
     start: parseInt(process.env.BATCH_START, 10) || 0,
-    size: parseInt(process.env.BATCH_SIZE, 10) || 10
+    size: parseInt(process.env.BATCH_SIZE, 10) || 100
   },
   processing: {
     delayMs: parseInt(process.env.PROCESSING_DELAY_MS, 10) || 1000,
@@ -320,7 +320,6 @@ async function processProduct(product, multimodalProcessor, index, total) {
       // Create text embedding from product data
       const textToEmbed = [
         product.name,
-        product.category,
         basicCaption,
       ]
         .filter(Boolean)

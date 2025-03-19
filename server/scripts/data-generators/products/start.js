@@ -1,6 +1,6 @@
 const { run } = require('./migrate');
 
-const filePath = "./products-light.csv";
+const filePath = "./products.csv";
 console.log('Starting data generator...');
 
 // Wrap in an async IIFE to use await and better handle errors
@@ -18,5 +18,7 @@ console.log('Starting data generator...');
     if (error.details) {
       console.error('Error details:', error.details);
     }
+
+    console.error('Error message:', error.message);
   }
 })();

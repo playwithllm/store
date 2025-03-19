@@ -55,27 +55,15 @@ const Home = () => {
     }
   };
 
-  const handleSearch = async (query: string) => {
-    if (query.trim() === '') {
+  const handleSearch = async (results: Product[]) => {
+    if (!results) {
       setIsSearchMode(false);
       setSearchResults(null);
       return;
     }
     
     setIsSearchMode(true);
-    setIsLoading(true);
-    
-    try {
-      const results = await searchProducts(query);
-      setSearchResults(results);
-      setError(null);
-    } catch (err) {
-      console.error('Error searching products:', err);
-      setError('Failed to search products. Please try again later.');
-      setSearchResults([]);
-    } finally {
-      setIsLoading(false);
-    }
+    setSearchResults(results);
   };
 
   const handleImageSearch = (results: Product[]) => {
@@ -95,14 +83,14 @@ const Home = () => {
     <Container maxWidth="lg">
       <Box textAlign="center" mb={6}>
         <Typography variant="h3" component="h1" gutterBottom fontWeight="bold">
-          Shop the Latest Products
+          Search the Latest Products
         </Typography>
         <Typography variant="subtitle1" color="text.secondary" mb={4}>
           Discover amazing deals on our top-quality products
         </Typography>
       </Box>
 
-      <SearchBar onSearch={handleSearch} onImageSearch={handleImageSearch} />
+      <SearchBar onSearch={handleSearch} onImageSearch={handleImageSearch} handleClearSearch={handleClearSearch} />
       
       {error && (
         <Alert severity="error" sx={{ mb: 4 }}>
@@ -145,7 +133,7 @@ const Home = () => {
         </Fade>
       )}
       
-      {!isLoading && !isSearchMode && (
+      {/* {!isLoading && !isSearchMode && (
         <Box display="flex" justifyContent="center" mt={6} mb={4}>
           <Button 
             variant="contained" 
@@ -165,11 +153,11 @@ const Home = () => {
             )}
           </Button>
         </Box>
-      )}
+      )} */}
 
       <Divider sx={{ my: 6 }} />
       
-      <Box textAlign="center" mb={8}>
+      {/* <Box textAlign="center" mb={8}>
         <Typography variant="h4" component="h2" gutterBottom>
           Why Shop With Us?
         </Typography>
@@ -205,7 +193,7 @@ const Home = () => {
             </Box>
           </Grid>
         </Grid>
-      </Box>
+      </Box> */}
     </Container>
   );
 };

@@ -74,7 +74,45 @@ export const getMoreProducts = async (count: number): Promise<Product[]> => {
   }
 };
 
-// Search products via API
+// RAG Search products via API - uses the server's /search endpoint for better semantic search
+export const ragSearchProducts = async (query: string): Promise<Product[]> => {
+  try {
+    console.log('Performing RAG search for:', query);
+    const response = await axios.get(`${API_URL}/products/search`, {
+      params: { 
+        keyword: query,
+        limit: 10
+      }
+    });
+    
+    // Server returns products directly from the RAG search
+    const searchResults = response.data;
+    
+    if (searchResults && Array.isArray(searchResults)) {
+      // Map to client format with enhanced metadata
+      return searchResults.map((product: any) => ({
+        id: product._id?.toString() || product.sourceId?.toString() || product.id?.toString(),
+        name: product.name,
+        price: product.price,
+        description: product.description || '',
+        image: product.image || product.images?.[0] || '',
+        category: product.category,
+        stock: product.inStock ? (product.rating?.count || 10) : 0,
+        rating: product.rating?.rate || 4.0,
+        // Add search relevance score if available
+        searchScore: product.score || null,
+        matchType: product.matchType || 'semantic'
+      }));
+    }
+    return [];
+  } catch (error) {
+    console.error('Error performing RAG search:', error);
+    // Fallback to regular search if RAG search fails
+    return searchProducts(query);
+  }
+};
+
+// Legacy search products via API - uses basic filtering
 export const searchProducts = async (query: string): Promise<Product[]> => {
   try {
     // In a real implementation, the server would have a search endpoint
@@ -111,20 +149,49 @@ export const searchProducts = async (query: string): Promise<Product[]> => {
   }
 };
 
-// Image search simulation (in a real app, this would use image recognition APIs)
-export const imageSearchProducts = (image: File): Promise<Product[]> => {
-  return new Promise(async (resolve) => {
-    // Simulate processing time
-    setTimeout(async () => {
-      try {
-        // Get random products as results (simulating image recognition)
-        const allProducts = await fetchProducts();
-        const shuffled = [...allProducts].sort(() => 0.5 - Math.random());
-        resolve(shuffled.slice(0, 3));
-      } catch (error) {
-        console.error('Error in image search:', error);
-        resolve([]);
+// Image search using the server's RAG functionality
+export const imageSearchProducts = async (image: File): Promise<Product[]> => {
+  try {
+    // Create form data for the image upload
+    const formData = new FormData();
+    formData.append('image', image);
+    
+    // Set headers for multipart form data
+    const config = {
+      headers: {
+        'Content-Type': 'multipart/form-data'
       }
-    }, 2000);
-  });
+    };
+    
+    // This endpoint would need to be implemented on the server
+    const response = await axios.post(
+      `${API_URL}/products/image-search`,
+      formData,
+      config
+    );
+    
+    // If the image search API isn't ready yet, fallback to a regular search
+    if (!response.data) {
+      console.log('Image search API not available, falling back to regular search');
+      return await ragSearchProducts('clothing'); // Fallback search term
+    }
+    
+    // Map server response to client format
+    return response.data.map((product: any) => ({
+      id: product._id?.toString() || product.sourceId?.toString() || product.id?.toString(),
+      name: product.name,
+      price: product.price,
+      description: product.description || '',
+      image: product.image || product.images?.[0] || '',
+      category: product.category,
+      stock: product.inStock ? (product.rating?.count || 10) : 0,
+      rating: product.rating?.rate || 4.0
+    }));
+  } catch (error) {
+    console.error('Error in image search:', error);
+    // Fallback to provide some results even if the API call fails
+    const allProducts = await fetchProducts();
+    const shuffled = [...allProducts].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, 3);
+  }
 };

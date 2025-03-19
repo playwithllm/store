@@ -4,6 +4,33 @@ const axios = require("axios");
 const fs = require("fs").promises;
 const path = require("path");
 
+// Error handling
+class AppError extends Error {
+  constructor(message, details) {
+    super(message);
+    this.name = "AppError";
+    this.details = details;
+  }
+}
+
+// Logger
+const logger = {
+  info: (message, data = {}) => {
+    console.log(`[INFO] ${message}`, data);
+  },
+  error: (message, error) => {
+    console.error(`[ERROR] ${message}`, error);
+  },
+  success: (message, data = {}) => {
+    console.log(`[SUCCESS] ${message}`, data);
+  },
+  debug: (message, data = {}) => {
+    // Always log debug messages during troubleshooting
+    console.log(`[DEBUG] ${message}`, data);
+  }
+};
+
+
 // Default configuration object for LLM services
 const DEFAULT_CONFIG = {
   llm: {
@@ -397,7 +424,7 @@ class MultimodalProcessor {
         content: [
           {
             type: "text",
-            text: `Generate a detailed caption in a single sentence for a product in this image, describing its type, color, material, and any notable features.`,
+            text: `Generate a caption in a single sentence for a product in this image, describing its type, color, material, and any notable features. Do not make assumptions about the product's use case or audience. The product name is: ${productName || "unknown"} and do not make unnecessary detail.`,
           },
         ],
       };

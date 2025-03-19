@@ -5,12 +5,19 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const bodyParser = require('body-parser');
 const dotenv = require('dotenv');
+const mongoose = require('mongoose');
 
 // Import routes
 const productRoutes = require('./routes/products');
 
 // Load environment variables
 dotenv.config();
+
+// MongoDB Connection
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/pwllmstoredb';
+mongoose.connect(MONGODB_URI)
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
 const app = express();
 const PORT = process.env.PORT || 4001;

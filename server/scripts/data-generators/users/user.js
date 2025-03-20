@@ -38,7 +38,9 @@ async function populateUsers() {
     console.log('Data populated');
 }
 
-mongoose.connect('mongodb://localhost:27017/pwllmdb').then(() => {
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/pwllmdb';
+
+mongoose.connect(MONGODB_URI).then(() => {
     console.log('Connected to MongoDB');
     populateUsers().then(() => {
       mongoose.connection.close();

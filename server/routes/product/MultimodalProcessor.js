@@ -27,9 +27,8 @@ const logger = {
   debug: (message, data = {}) => {
     // Always log debug messages during troubleshooting
     console.log(`[DEBUG] ${message}`, data);
-  }
+  },
 };
-
 
 // Default configuration object for LLM services
 const DEFAULT_CONFIG = {
@@ -38,32 +37,24 @@ const DEFAULT_CONFIG = {
     ollama: {
       baseUrl: "http://192.168.4.106:11434",
       models: {
-        multimodal: "llama3.2", // For image+text tasks
+        multimodal: "gemma3:12b", // For image+text tasks
         text: "gemma3:12b", // For text-only tasks
-        coder: "qwen2.5-coder:32b", // For code-related tasks
-        embedding: "nomic-embed-text" // For embeddings
-      }
-    },
-    // Alternative service configuration (e.g., OpenAI compatible API)
-    alternative: {
-      baseUrl: "http://192.168.4.28:8000",
-      models: {
-        multimodal: "OpenGVLab/InternVL2_5-1B-MPO",
-        text: "gemma3:12b"
-      }
+        coder: "gemma3:12b", // For code-related tasks
+      },
     },
     // Which service to use by default
-    defaultProvider: "ollama"
+    defaultProvider: "ollama",
   },
   milvus: {
     address: "localhost:19530",
-    collection: "multimodal_collection_pwllm"
+    collection: "multimodal_collection_pwllm",
   },
   storage: {
-    baseImagePath: process.env.IMAGE_STORAGE_PATH || path.join(process.cwd(), "uploads"),
+    baseImagePath:
+      process.env.IMAGE_STORAGE_PATH || path.join(process.cwd(), "uploads"),
     maxImageSize: 5 * 1024 * 1024, // 5MB
-    allowedFormats: ["jpg", "jpeg", "png"]
-  }
+    allowedFormats: ["jpg", "jpeg", "png"],
+  },
 };
 
 class MultimodalProcessor {
@@ -72,7 +63,7 @@ class MultimodalProcessor {
     this.config = {
       llm: { ...DEFAULT_CONFIG.llm, ...(config.llm || {}) },
       milvus: { ...DEFAULT_CONFIG.milvus, ...(config.milvus || {}) },
-      storage: { ...DEFAULT_CONFIG.storage, ...(config.storage || {}) }
+      storage: { ...DEFAULT_CONFIG.storage, ...(config.storage || {}) },
     };
 
     // Initialize Milvus client
@@ -85,12 +76,12 @@ class MultimodalProcessor {
     this.clipModel = null;
     this.pipeline = null;
     this.embeddingModel = null;
-    
+
     // Log initialization
     console.log("MultimodalProcessor initialized with config:", {
       llmProvider: this.config.llm.defaultProvider,
       milvusAddress: this.config.milvus.address,
-      collectionName: this.collectionName
+      collectionName: this.collectionName,
     });
   }
 
@@ -98,19 +89,22 @@ class MultimodalProcessor {
   getLLMServiceUrl(endpoint = "chat/completions") {
     const provider = this.config.llm.defaultProvider;
     const baseUrl = this.config.llm[provider].baseUrl;
-    
+
     // Different endpoints for different providers
-    if (provider === 'ollama') {
+    if (provider === "ollama") {
       return `${baseUrl}/api/chat`;
     }
-    
+
     return `${baseUrl}/v1/${endpoint}`;
   }
 
   // Get the appropriate model name for the task
-  getModelName(task = 'text') {
+  getModelName(task = "text") {
     const provider = this.config.llm.defaultProvider;
-    return this.config.llm[provider].models[task] || this.config.llm[provider].models.text;
+    return (
+      this.config.llm[provider].models[task] ||
+      this.config.llm[provider].models.text
+    );
   }
 
   async init() {
@@ -131,7 +125,7 @@ class MultimodalProcessor {
       );
 
       console.log("Models initialized successfully");
-      
+
       // Verify LLM service connection
       await this.testLLMConnection();
     } catch (error) {
@@ -144,20 +138,32 @@ class MultimodalProcessor {
   async testLLMConnection() {
     const provider = this.config.llm.defaultProvider;
     try {
-      if (provider === 'ollama') {
-        const response = await axios.get(`${this.config.llm.ollama.baseUrl}/api/tags`);
-        console.log(`Connected to Ollama, available models: ${response.data.models.length}`);
+      if (provider === "ollama") {
+        const response = await axios.get(
+          `${this.config.llm.ollama.baseUrl}/api/tags`
+        );
+        console.log(
+          `Connected to Ollama, available models: ${response.data.models.length}`
+        );
       } else {
         // Test alternative provider
-        const response = await axios.get(`${this.config.llm.alternative.baseUrl}/v1/models`);
-        console.log(`Connected to alternative LLM provider, available models: ${response.data.data.length}`);
+        const response = await axios.get(
+          `${this.config.llm.alternative.baseUrl}/v1/models`
+        );
+        console.log(
+          `Connected to alternative LLM provider, available models: ${response.data.data.length}`
+        );
       }
       return true;
     } catch (error) {
-      console.error(`Failed to connect to LLM provider (${provider}):`, error.message);
+      console.error(
+        `Failed to connect to LLM provider (${provider}):`,
+        error.message
+      );
       console.log("Attempting to switch to fallback provider...");
       // Attempt to switch to fallback provider
-      this.config.llm.defaultProvider = provider === 'ollama' ? 'alternative' : 'ollama';
+      this.config.llm.defaultProvider =
+        provider === "ollama" ? "alternative" : "ollama";
       return false;
     }
   }
@@ -173,21 +179,26 @@ class MultimodalProcessor {
       if (Buffer.isBuffer(imageInput)) {
         return imageInput;
       }
-      
+
       // If input is a URL, download it first
-      if (typeof imageInput === 'string') {
-        if (imageInput.startsWith('http://') || imageInput.startsWith('https://')) {
-          const response = await axios.get(imageInput, { responseType: 'arraybuffer' });
-          return Buffer.from(response.data, 'binary');
+      if (typeof imageInput === "string") {
+        if (
+          imageInput.startsWith("http://") ||
+          imageInput.startsWith("https://")
+        ) {
+          const response = await axios.get(imageInput, {
+            responseType: "arraybuffer",
+          });
+          return Buffer.from(response.data, "binary");
         } else {
           // Assume it's a file path
           return await fs.readFile(imageInput);
         }
       }
-      
-      throw new Error('Unsupported image input type');
+
+      throw new Error("Unsupported image input type");
     } catch (error) {
-      console.error('Error getting image buffer:', error);
+      console.error("Error getting image buffer:", error);
       throw error;
     }
   }
@@ -271,55 +282,64 @@ class MultimodalProcessor {
 
   async generateCompletionSync(prompts) {
     console.log("generateCompletionSync(): prompts:", prompts);
-    
+
     const provider = this.config.llm.defaultProvider;
     let response;
-    
+
     try {
-      if (provider === 'ollama') {
+      if (provider === "ollama") {
         // Format for Ollama API - need to handle the image format differently
         // Check if any prompt contains an image
-        const hasImage = prompts.some(p => p.content?.some?.(c => c.type === 'image_url'));
-        const modelName = this.getModelName(hasImage ? 'multimodal' : 'text');
-        
+        const hasImage = prompts.some((p) =>
+          p.content?.some?.((c) => c.type === "image_url")
+        );
+        const modelName = this.getModelName(hasImage ? "multimodal" : "text");
+
+        console.log("generateCompletionSync(): using model:", modelName);
+
         if (hasImage) {
           // For prompts with images, need to format them specifically for Ollama
-          const formattedPrompts = prompts.map(prompt => {
+          const formattedPrompts = prompts.map((prompt) => {
             if (Array.isArray(prompt.content)) {
               // Format image content differently for Ollama
               const textParts = [];
               let imageBase64 = null;
-              
-              prompt.content.forEach(content => {
-                if (content.type === 'text') {
+
+              prompt.content.forEach((content) => {
+                if (content.type === "text") {
                   textParts.push(content.text);
-                } else if (content.type === 'image_url' && content.image_url?.url) {
+                } else if (
+                  content.type === "image_url" &&
+                  content.image_url?.url
+                ) {
                   // Extract base64 data from the URL
-                  const base64Match = content.image_url.url.match(/^data:image\/[a-zA-Z]+;base64,(.+)$/);
+                  const base64Match = content.image_url.url.match(
+                    /^data:image\/[a-zA-Z]+;base64,(.+)$/
+                  );
                   if (base64Match && base64Match[1]) {
                     imageBase64 = base64Match[1];
                   }
                 }
               });
-              
+
               // Return formatted content for Ollama
               const formattedPrompt = {
                 role: prompt.role,
-                content: textParts.join('\n')
+                content: textParts.join("\n"),
               };
-              
+
               // Add image if present
               if (imageBase64) {
                 formattedPrompt.images = [imageBase64];
               }
-              
+
               return formattedPrompt;
             }
             return prompt;
           });
-          
+
           console.log("Using Ollama multimodal format");
-          
+
           response = await axios({
             method: "post",
             url: this.getLLMServiceUrl(),
@@ -359,7 +379,11 @@ class MultimodalProcessor {
           },
           data: {
             model: this.getModelName(
-              prompts.some(p => p.content?.some?.((c) => c.type === 'image_url')) ? 'multimodal' : 'text'
+              prompts.some((p) =>
+                p.content?.some?.((c) => c.type === "image_url")
+              )
+                ? "multimodal"
+                : "text"
             ),
             messages: prompts,
             temperature: 0.7,
@@ -367,25 +391,29 @@ class MultimodalProcessor {
           },
         });
       }
-      
+
       const output = response.data;
       console.log("generateCompletionSync(): output:", output);
-      
+
       return output;
     } catch (error) {
-      console.error(`Error generating completion with ${provider}:`, error.message);
-      
+      console.error(
+        `Error generating completion with ${provider}:`,
+        error.message
+      );
+
       // If this is the first attempt and we haven't tried the fallback provider yet
       if (!prompts._retried) {
         console.log("Attempting with fallback provider...");
         // Switch to fallback provider
-        this.config.llm.defaultProvider = provider === 'ollama' ? 'alternative' : 'ollama';
+        this.config.llm.defaultProvider =
+          provider === "ollama" ? "alternative" : "ollama";
         // Mark as retried to prevent infinite loop
         prompts._retried = true;
         // Try again with the new provider
         return this.generateCompletionSync(prompts);
       }
-      
+
       throw error;
     }
   }
@@ -424,7 +452,7 @@ class MultimodalProcessor {
         content: [
           {
             type: "text",
-            text: `Generate a caption in a single sentence for a product in this image, describing its type, color, material, and any notable features. Do not make assumptions about the product's use case or audience. The product name is: ${productName || "unknown"} and do not make unnecessary detail.`,
+            text: `Generate a caption in a single sentence for a product in this image, describing its type, color, material, and any notable features. Do not make assumptions about the product's use case or audience and do not again include your words (eg. Here is your caption).`,
           },
         ],
       };
@@ -441,10 +469,11 @@ class MultimodalProcessor {
       prompts.push(prompt);
 
       const output = await this.generateCompletionSync(prompts);
-      const responseContent = this.config.llm.defaultProvider === 'ollama' 
-        ? output.message.content 
-        : output.choices[0].message.content;
-        
+      const responseContent =
+        this.config.llm.defaultProvider === "ollama"
+          ? output.message.content
+          : output.choices[0].message.content;
+
       console.log("generateCaption(): image caption:", {
         caption: responseContent,
         img: localImagePath,
@@ -460,8 +489,23 @@ class MultimodalProcessor {
   async expandTextWithVLLM(text) {
     console.log("expandTextWithVLLM(): text:", text);
     try {
-      const systemPrompt = `You are a product description optimizer. Your task is to enhance product titles by expanding them into meaningful, search-friendly sentences. Focus on including relevant details like product type, features, color, material, target audience, and popular use cases (e.g., Halloween, cosplay, parties, or events). Ensure the expansion remains concise, factually accurate, and avoids adding unverified claims. Always write the expansion as a single, well-constructed sentence.`;
-      const prompt = `Take the product title '${text}' and expand it into a meaningful, single-sentence description that includes relevant details about the product, such as type, color, features, target audience, and potential use cases.`;
+      // Check if this is a search query (no pipe separators) or product data
+      const isSearchQuery = !text.includes("|");
+
+      let systemPrompt, prompt;
+
+      if (isSearchQuery) {
+        // For search queries - optimize for finding relevant products
+        systemPrompt = `You are a search query optimizer for a product search engine. Your task is to expand brief search queries into comprehensive search terms that will help find relevant products. Include synonyms, related categories, common features, materials, and use cases. Focus on extracting and enhancing the intent behind the search without changing its core meaning. Your expansion should capture both specific attributes and general product categories.`;
+
+        prompt = `Transform this brief search query '${text}' into a comprehensive set of search terms that will help find relevant products. Include synonyms, related product categories, and typical features that users searching for this might be looking for. Format as a comma-separated list of key terms and phrases.`;
+      } else {
+        // For product data - optimize for searchability
+        systemPrompt = `You are a product description optimizer. Your task is to analyze product data and extract the most important search-relevant features and attributes. Focus on identifying key aspects like product type, category, color, material, features, and use cases. Create a structured set of terms that would make this product discoverable through search. Be specific and factual, using only information present in the provided text.`;
+
+        prompt = `Analyze this product information and extract the most important search-relevant terms and phrases: '${text}'. Focus on key product attributes, categories, features, and potential use cases. Format your response as a comma-separated list of key terms and phrases.`;
+      }
+
       console.log("expandTextWithVLLM(): prompt:", prompt);
 
       const prompts = [
@@ -470,14 +514,20 @@ class MultimodalProcessor {
       ];
 
       const output = await this.generateCompletionSync(prompts);
-      console.log("expandTextWithVLLM(): output:", output);
+      let vllmResponseText;
 
-      const vllmResponseText = output.choices[0].message.content;
+      if (this.config.llm.defaultProvider === "ollama") {
+        vllmResponseText = output.message.content;
+      } else {
+        vllmResponseText = output.choices[0].message.content;
+      }
+
       console.log(`Expanded "${text}" to: ${vllmResponseText}`);
       return vllmResponseText;
     } catch (error) {
       console.error("Error expanding text:", error);
-      throw error;
+      // Return the original text in case of error
+      return text;
     }
   }
 
@@ -498,11 +548,21 @@ class MultimodalProcessor {
         throw new Error("Input text cannot be empty");
       }
 
-      // Only expand text if flag is true and text isn't too long
-      const textToEmbed =
-        useExpansion && cleanText.length < 100
-          ? await this.expandTextWithVLLM(cleanText)
-          : cleanText;
+      // Always expand search queries (which are typically short)
+      // but not product data (which is typically longer)
+      const shouldExpand = useExpansion;
+
+      const textToEmbed = shouldExpand
+        ? await this.expandTextWithVLLM(cleanText)
+        : cleanText;
+
+      // Log for debugging
+      logger.debug("Generating embedding for text:", {
+        originalLength: cleanText.length,
+        expandedLength: textToEmbed.length,
+        wasExpanded: textToEmbed !== cleanText,
+        firstFewWords: textToEmbed.substring(0, 50),
+      });
 
       const output = await this.embeddingModel(textToEmbed, {
         pooling: "mean",
@@ -773,37 +833,83 @@ class MultimodalProcessor {
 
   async searchProductEmbedding(searchText, limit = 5) {
     try {
-      console.log("searchProductEmbedding(): searchText:", searchText);
-      // For search queries, we want to be more aggressive with expansion
-      // const expandedQuery = await this.expandTextWithVLLM(searchText);
-      // console.log('searchProductEmbedding(): expandedQuery:', expandedQuery);
-      const queryVector = await this.getEmbedding(searchText);
-      const searchResults = await this.milvusClient.search({
-        collection_name: this.collectionName,
-        vector: queryVector,
-        field_name: "product_name_vector",
-        limit: limit * 2, // Get more results initially for better filtering
-        params: { nprobe: 16 }, // Increased from 10 for better recall
-        output_fields: ["metadata"],
+      logger.debug("searchProductEmbedding(): searchText:", searchText);
+
+      // Get embedding for the search query
+      // Setting useExpansion to false for search queries
+      const queryVector = await this.getEmbedding(searchText, false);
+
+      // Perform parallel searches on both text and image vectors
+      const [textSearchResults, imageSearchResults] = await Promise.all([
+        // Search against product text data
+        this.milvusClient.search({
+          collection_name: this.collectionName,
+          vector: queryVector,
+          field_name: "product_name_vector",
+          limit: limit * 2,
+          params: { nprobe: 16 }, // Higher nprobe for better recall
+          output_fields: ["metadata"],
+        }),
+
+        // Search against product image data
+        this.milvusClient.search({
+          collection_name: this.collectionName,
+          vector: queryVector,
+          field_name: "image_vector",
+          limit: limit,
+          params: { nprobe: 16 },
+          output_fields: ["metadata"],
+        }),
+      ]);
+
+      logger.debug("Vector search results count:", {
+        textResults: textSearchResults.results.length,
+        imageResults: imageSearchResults.results.length,
       });
 
-      console.log(
-        "searchProductEmbedding(): searchResults:",
-        searchResults.results
-      );
+      // Process text search results
+      const textResults = textSearchResults.results.map((result) => ({
+        productId: result.metadata.productId,
+        score: result.score,
+        created_at: result.metadata.created_at,
+        searchType: "text",
+      }));
 
-      // Process and rank results considering semantic similarity
-      const processedData = searchResults.results
-        .map((result) => ({
-          productId: result.metadata.productId,
-          score: result.score,
-          created_at: result.metadata.created_at,
-        }))
-        // Optional: Additional relevance scoring logic here
+      // Process image search results
+      const imageResults = imageSearchResults.results.map((result) => ({
+        productId: result.metadata.productId,
+        score: result.score * 0.9, // Slightly lower weight for image results
+        created_at: result.metadata.created_at,
+        searchType: "image",
+      }));
+
+      // Combine results
+      const combinedResults = [...textResults, ...imageResults];
+
+      // Create a Map to merge duplicate products and keep the higher score
+      const productMap = new Map();
+
+      combinedResults.forEach((result) => {
+        const existing = productMap.get(result.productId);
+        if (!existing || existing.score < result.score) {
+          productMap.set(result.productId, result);
+        }
+      });
+
+      // Convert back to array, sort by score, and limit results
+      const processedData = Array.from(productMap.values())
         .sort((a, b) => b.score - a.score)
         .slice(0, limit);
 
-      logger.debug("Search results for:", searchText, processedData);
+      logger.debug("Final search results for:", searchText, {
+        count: processedData.length,
+        topScore: processedData.length > 0 ? processedData[0].score : 0,
+        bottomScore:
+          processedData.length > 0
+            ? processedData[processedData.length - 1].score
+            : 0,
+      });
+
       return processedData;
     } catch (error) {
       logger.error("Error searching product embedding:", error);
@@ -937,79 +1043,76 @@ User question: "${userQuery}"`);
 
   async ragSearch(Product, query, limit = 10) {
     try {
-      // Search in Milvus
-      const searchResults = await this.searchProductEmbedding(query, limit);
+      logger.info("Starting RAG search for query:", { query });
 
-      console.log("ragSearch(): searchResults:", searchResults);
+      // Perform multiple search strategies in parallel
+      const [exactResults, semanticResults] = await Promise.all([
+        // Direct keyword search in MongoDB (as fallback)
+        Product.find({
+          $or: [
+            { name: { $regex: query, $options: "i" } },
+            { category: { $regex: query, $options: "i" } },
+            { description: { $regex: query, $options: "i" } },
+          ],
+        }).limit(limit),
 
-      // Get product IDs from results
-      const productIds = searchResults.map((result) => result.productId);
+        // Vector search with original query
+        this.searchProductEmbedding(query, limit * 2),
+      ]);
 
-      console.log("ragSearch(): productIds:", productIds);
-
-      //       // Fetch full product details from MongoDB
-      //       const products = await Product.find({ sourceId: { $in: productIds } });
-
-      //       // Prepare context for LLM
-      //       const context = products.map(p => `
-      // Product ID: ${p.sourceId} \n
-      // Name: ${p.name} \n
-      // Category: ${p.category} \n
-      // `).join('\n---\n');
-
-      //       const systemPrompt = `You are a helpful assistant that searches for products based on user queries. Your task is to analyze the user's query and find the most relevant products from the provided list. Prioritize products that are semantically similar to the query. Match on product type, category, or context, not just keywords. For example:
-
-      //   - If the query mentions clothing-related terms like 'dress' or 'outfit,' prioritize products such as costumes, apparel, or accessories over unrelated items.
-      //   - If the query mentions electronics, match devices, gadgets, or components that fit the context.
-      //   - Always aim to identify the product(s) that best align with the intent of the query, even if the exact words do not match. Use all available product information, including names, descriptions, and image captions, to determine relevance.`;
-
-      //       // Generate LLM prompt
-      //       const prompt = `User Query: "${query}"
-
-      // Available Products:
-      // ${context}
-
-      // Based on the user's query, analyze these products and return ONLY the product IDs that best match the query.
-      // Format your response as a comma-separated list of product IDs, nothing else.
-      // Example response format: ["123", "456", "789"]`;
-
-      //       const prompts = [
-      //         {
-      //           role: 'system',
-      //           content: systemPrompt
-      //         },
-      //         {
-      //           role: 'user',
-      //           content: prompt
-      //         }
-      //       ]
-
-      //       // Get LLM response
-      //       const llmResponse = await this.generateCompletionSync(prompts);
-
-      //       console.log('ragSearch(): LLM response:', llmResponse.choices[0].message);
-
-      //       // Extract product IDs from LLM response
-      //       const recommendedIds = llmResponse.choices[0].message.content
-      //         .split(',')
-      //         .map(id => id.trim())
-      //         .filter(Boolean);
-
-      //       console.log('ragSearch(): recommendedIds:', recommendedIds);
-
-      // Fetch final products in order of recommendation
-      const finalProducts = await Product.find({
-        sourceId: { $in: productIds },
+      logger.debug("Search results count:", {
+        exactMatches: exactResults.length,
+        semanticMatches: semanticResults.length,
       });
 
-      // Sort products according to LLM's recommendation order
-      const sortedProducts = productIds
-        .map((id) => finalProducts.find((p) => p.sourceId === id))
-        .filter(Boolean);
+      // Extract product IDs from vector search results
+      const semanticProductIds = semanticResults.map(
+        (result) => result.productId
+      );
 
-      console.log("ragSearch(): sortedProducts:", sortedProducts.length);
+      // Fetch complete product details for semantic results
+      const semanticProducts = await Product.find({
+        sourceId: { $in: semanticProductIds },
+      });
 
-      return sortedProducts;
+      // Combine results with proper ordering (semantic first, then exact matches)
+      // and remove duplicates
+      const combinedProductMap = new Map();
+
+      // Add semantic search results first (they are sorted by relevance score)
+      semanticProductIds.forEach((productId, index) => {
+        const product = semanticProducts.find((p) => p.sourceId === productId);
+        if (product && !combinedProductMap.has(product.sourceId)) {
+          // Add score information to help with debugging
+          const result = semanticResults[index];
+          product._searchScore = result ? result.score : 0;
+          product._searchMethod = "semantic";
+          combinedProductMap.set(product.sourceId, product);
+        }
+      });
+
+      // Then add any exact matches that weren't already included
+      exactResults.forEach((product) => {
+        if (!combinedProductMap.has(product.sourceId)) {
+          product._searchMethod = "exact";
+          combinedProductMap.set(product.sourceId, product);
+        }
+      });
+
+      // Convert to array and limit results
+      const allResults = Array.from(combinedProductMap.values()).slice(
+        0,
+        limit
+      );
+
+      logger.info("RAG search completed", {
+        query,
+        resultCount: allResults.length,
+        semanticCount: semanticResults.length,
+        exactCount: exactResults.length,
+      });
+
+      return allResults;
     } catch (error) {
       logger.error("Error in RAG search:", error);
       throw error;

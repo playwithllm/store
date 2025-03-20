@@ -70,30 +70,57 @@ const ragSearch = async (queryObject) => {
     logger.info(`ragSearch(): ${model} searched`, {
       query: searchText,
     });
+    
+    // Create and initialize MultimodalProcessor with enhanced logging
     const multimodalProcessor = new MultimodalProcessor();
     await multimodalProcessor.init();
     await multimodalProcessor.initializeCollection();
+    
+    // Test connection to Milvus
     const isConnected = await multimodalProcessor.testConnection();
     if (!isConnected) {
       logger.warn(`ragSearch(): Failed to connect to Milvus`);
       return getAll({ keyword: searchText }); // Fallback to regular text search
     }
-
-    // Perform RAG search
+    
+    // Modify search parameters based on query characteristics
+    let limit = 10;
+    let useHybridSearch = true;
+    
+    // If query is very short (1-2 words), increase result limit for better coverage
+    if (searchText.split(/\s+/).length <= 2) {
+      limit = 16;
+      logger.debug("Using increased limit for short query");
+    }
+    
+    // Handle specific query types differently
+    if (searchText.length >= 30) {
+      // Long queries likely have more specific intent
+      limit = 8;
+      logger.debug("Using decreased limit for long, specific query");
+    }
+    
+    // Perform RAG search with optimized parameters
     const results = await multimodalProcessor.ragSearch(
       Product,
       searchText,
-      10
+      limit
     );
 
     if (!results || results.length === 0) {
-      logger.warn(`ragSearch(): No results found`);
+      logger.warn(`ragSearch(): No results found, falling back to keyword search`);
       return getAll({ keyword: searchText }); // Fallback to regular text search
     }
 
-    logger.info(`ragSearch(): ${model} searched`, {
+    logger.info(`ragSearch(): ${model} searched successfully`, {
       query: searchText,
       resultCount: results.length,
+      // Log search method distribution for analysis
+      methodCounts: results.reduce((counts, product) => {
+        const method = product._searchMethod || 'unknown';
+        counts[method] = (counts[method] || 0) + 1;
+        return counts;
+      }, {})
     });
 
     return results;

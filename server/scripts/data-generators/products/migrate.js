@@ -10,16 +10,16 @@ const CONFIG = {
     uri: process.env.MONGODB_URI || "mongodb://localhost:27017/pwllmstoredb",
     options: {
       useNewUrlParser: true,
-      useUnifiedTopology: true
-    }
+      useUnifiedTopology: true,
+    },
   },
   batch: {
     start: parseInt(process.env.BATCH_START, 10) || 0,
-    size: parseInt(process.env.BATCH_SIZE, 10) || 100
+    size: parseInt(process.env.BATCH_SIZE, 10) || 10000,
   },
   processing: {
     delayMs: parseInt(process.env.PROCESSING_DELAY_MS, 10) || 1000,
-    concurrency: parseInt(process.env.PROCESSING_CONCURRENCY, 10) || 3
+    concurrency: parseInt(process.env.PROCESSING_CONCURRENCY, 10) || 3,
   },
   multimodal: {
     // LLM provider configuration
@@ -29,32 +29,28 @@ const CONFIG = {
       ollama: {
         baseUrl: process.env.OLLAMA_URL || "http://192.168.4.106:11434",
         models: {
-          multimodal: process.env.OLLAMA_MODEL_MULTIMODAL || "llama3.2",
+          multimodal: process.env.OLLAMA_MODEL_MULTIMODAL || "gemma3:12b",
           text: process.env.OLLAMA_MODEL_TEXT || "gemma3:12b",
-          coder: process.env.OLLAMA_MODEL_CODER || "qwen2.5-coder:32b",
-          embedding: process.env.OLLAMA_MODEL_EMBEDDING || "nomic-embed-text"
-        }
+          coder: process.env.OLLAMA_MODEL_CODER || "gemma3:12b",
+        },
       },
-      alternative: {
-        baseUrl: process.env.ALT_LLM_URL || "http://192.168.4.28:8000",
-        models: {
-          multimodal: process.env.ALT_MODEL_MULTIMODAL || "OpenGVLab/InternVL2_5-1B-MPO",
-          text: process.env.ALT_MODEL_TEXT || "gemma3:12b"
-        }
-      }
     },
     // Milvus configuration
     milvus: {
       address: process.env.MILVUS_ADDRESS || "localhost:19530",
-      collection: process.env.MILVUS_COLLECTION || "multimodal_collection_pwllm"
+      collection:
+        process.env.MILVUS_COLLECTION || "multimodal_collection_pwllm",
     },
     // Storage configuration for images
     storage: {
-      baseImagePath: process.env.IMAGE_STORAGE_PATH || path.join(process.cwd(), "uploads"),
+      baseImagePath:
+        process.env.IMAGE_STORAGE_PATH || path.join(process.cwd(), "uploads"),
       maxImageSize: parseInt(process.env.MAX_IMAGE_SIZE, 10) || 5 * 1024 * 1024,
-      allowedFormats: (process.env.ALLOWED_IMAGE_FORMATS || "jpg,jpeg,png").split(",")
-    }
-  }
+      allowedFormats: (
+        process.env.ALLOWED_IMAGE_FORMATS || "jpg,jpeg,png"
+      ).split(","),
+    },
+  },
 };
 
 // Error handling
@@ -80,7 +76,7 @@ const logger = {
   debug: (message, data = {}) => {
     // Always log debug messages during troubleshooting
     console.log(`[DEBUG] ${message}`, data);
-  }
+  },
 };
 
 /**
@@ -109,7 +105,7 @@ const createProduct = async (data) => {
  */
 const resetDatabase = async (multimodalProcessor) => {
   logger.info("Resetting databases...");
-  
+
   try {
     // Reset MongoDB
     await Product.deleteMany({});
@@ -119,13 +115,15 @@ const resetDatabase = async (multimodalProcessor) => {
     if (multimodalProcessor) {
       await multimodalProcessor.deleteCollection();
       logger.info("Milvus collection reset");
-      
+
       // Verification
       const stats = await multimodalProcessor.getCollectionStats();
       logger.debug("Milvus collection stats after reset", stats);
-      
+
       const savedProducts = await multimodalProcessor.listAllProducts();
-      logger.debug("Current products after reset", { count: savedProducts.length });
+      logger.debug("Current products after reset", {
+        count: savedProducts.length,
+      });
     }
   } catch (error) {
     logger.error("Error resetting databases", error);
@@ -148,8 +146,13 @@ async function processProductImage(multimodalProcessor, product) {
 
     let imagePath;
     if (product.image.startsWith("http")) {
-      logger.debug(`Downloading image for product ${product.id}`, { url: product.image });
-      imagePath = await multimodalProcessor.downloadImage(product.id, product.image);
+      logger.debug(`Downloading image for product ${product.id}`, {
+        url: product.image,
+      });
+      imagePath = await multimodalProcessor.downloadImage(
+        product.id,
+        product.image
+      );
       logger.debug(`Image downloaded to ${imagePath}`);
     } else {
       imagePath = path.join(
@@ -161,34 +164,51 @@ async function processProductImage(multimodalProcessor, product) {
 
     // Check if the image file exists
     try {
-      const fs = require('fs');
+      const fs = require("fs");
       if (!fs.existsSync(imagePath)) {
         logger.error(`Image file does not exist at path: ${imagePath}`);
         return { basicCaption: null, imageEmbedding: null };
       }
     } catch (fsError) {
-      logger.error(`Error checking if image file exists: ${imagePath}`, fsError);
+      logger.error(
+        `Error checking if image file exists: ${imagePath}`,
+        fsError
+      );
     }
 
     // Generate both caption and embedding in parallel
-    logger.debug(`Starting parallel processing for product ${product.id} image`);
+    logger.debug(
+      `Starting parallel processing for product ${product.id} image`
+    );
     let basicCaption = null;
     let imageEmbedding = null;
-    
+
     try {
-      basicCaption = await multimodalProcessor.generateCaption(product.id, imagePath, product.name);
-      logger.debug(`Caption generated for product ${product.id}`, { caption: basicCaption });
+      basicCaption = await multimodalProcessor.generateCaption(
+        product.id,
+        imagePath,
+        product.name
+      );
+      logger.debug(`Caption generated for product ${product.id}`, {
+        caption: basicCaption,
+      });
     } catch (captionError) {
-      logger.error(`Error generating caption for product ${product.id}`, captionError);
+      logger.error(
+        `Error generating caption for product ${product.id}`,
+        captionError
+      );
     }
-    
+
     try {
       imageEmbedding = await multimodalProcessor.getImageEmbedding(imagePath);
       logger.debug(`Image embedding generated for product ${product.id}`, {
-        embeddingLength: imageEmbedding ? imageEmbedding.length : 0
+        embeddingLength: imageEmbedding ? imageEmbedding.length : 0,
       });
     } catch (embeddingError) {
-      logger.error(`Error generating image embedding for product ${product.id}`, embeddingError);
+      logger.error(
+        `Error generating image embedding for product ${product.id}`,
+        embeddingError
+      );
     }
 
     return { basicCaption, imageEmbedding };
@@ -206,7 +226,12 @@ async function processProductImage(multimodalProcessor, product) {
  * @param {String} imageEmbedding - Product image embedding
  * @returns {Array} Inserted IDs
  */
-async function storeProductVector(multimodalProcessor, product, textEmbedding, imageEmbedding) {
+async function storeProductVector(
+  multimodalProcessor,
+  product,
+  textEmbedding,
+  imageEmbedding
+) {
   try {
     const insertData = {
       collection_name: multimodalProcessor.collectionName,
@@ -228,7 +253,9 @@ async function storeProductVector(multimodalProcessor, product, textEmbedding, i
       collection_names: [multimodalProcessor.collectionName],
     });
 
-    logger.success(`Vector embedding stored for product ${product.id}`, { IDs });
+    logger.success(`Vector embedding stored for product ${product.id}`, {
+      IDs,
+    });
     return IDs;
   } catch (error) {
     logger.error(`Failed to store vector for product ${product.id}`, error);
@@ -241,9 +268,7 @@ async function storeProductVector(multimodalProcessor, product, textEmbedding, i
  * @returns {Number} Unique ID
  */
 function generateUniqueId() {
-  return parseInt(
-    Date.now().toString() + Math.floor(Math.random() * 1000)
-  );
+  return parseInt(Date.now().toString() + Math.floor(Math.random() * 1000));
 }
 
 /**
@@ -257,12 +282,12 @@ async function processProduct(product, multimodalProcessor, index, total) {
   try {
     logger.info(`Processing product ${index} of ${total}`, {
       id: product.id,
-      name: product.name
+      name: product.name,
     });
 
     // Check if product already exists in both databases
     const existingProduct = await Product.findOne({ sourceId: product.id });
-    
+
     logger.debug(`Checking if product exists in Milvus: ${product.id}`);
     let existingVector = [];
     try {
@@ -270,26 +295,33 @@ async function processProduct(product, multimodalProcessor, index, total) {
         productId: product.id,
       });
     } catch (searchError) {
-      logger.error(`Error searching Milvus for product ${product.id}`, searchError);
+      logger.error(
+        `Error searching Milvus for product ${product.id}`,
+        searchError
+      );
     }
 
     logger.debug(`Product ${product.id} existence check:`, {
       existsInMongoDB: !!existingProduct,
-      existsInMilvus: existingVector && existingVector.length > 0
+      existsInMilvus: existingVector && existingVector.length > 0,
     });
 
     if (existingProduct && existingVector && existingVector.length > 0) {
-      logger.info(`Product ${product.id} already exists in both databases, skipping`);
+      logger.info(
+        `Product ${product.id} already exists in both databases, skipping`
+      );
       return;
     }
 
     // Get the image URL - handle both single image and images array format
-    const imageUrl = product.image || (product.images && product.images.length > 0 ? product.images[0] : null);
-    
+    const imageUrl =
+      product.image ||
+      (product.images && product.images.length > 0 ? product.images[0] : null);
+
     // Process image and get analysis
     logger.debug(`Starting image processing for product ${product.id}`, {
       hasImage: !!imageUrl,
-      imagePath: imageUrl
+      imagePath: imageUrl,
     });
 
     const productWithImage = { ...product, image: imageUrl };
@@ -300,7 +332,7 @@ async function processProduct(product, multimodalProcessor, index, total) {
 
     logger.debug(`Image processing results for product ${product.id}:`, {
       hasCaption: !!basicCaption,
-      hasEmbedding: !!imageEmbedding
+      hasEmbedding: !!imageEmbedding,
     });
 
     // Create MongoDB document if needed
@@ -320,21 +352,26 @@ async function processProduct(product, multimodalProcessor, index, total) {
       // Create text embedding from product data
       const textToEmbed = [
         product.name,
+        product.category,
+        product.description,
+        product.specification,
         basicCaption,
       ]
         .filter(Boolean)
-        .join(" ");
+        .join(" | ");
 
-      logger.debug(`Creating text embedding for product ${product.id}`, { text: textToEmbed });
-      
+      logger.debug(`Creating text embedding for product ${product.id}`, {
+        text: textToEmbed,
+      });
+
       try {
         const textEmbedding = await multimodalProcessor.getEmbedding(
           textToEmbed,
           false
         );
-        
+
         logger.debug(`Text embedding created for product ${product.id}`, {
-          embeddingLength: textEmbedding ? textEmbedding.length : 0
+          embeddingLength: textEmbedding ? textEmbedding.length : 0,
         });
 
         // Store vector in Milvus
@@ -345,12 +382,15 @@ async function processProduct(product, multimodalProcessor, index, total) {
           imageEmbedding
         );
       } catch (embeddingError) {
-        logger.error(`Failed to create text embedding for product ${product.id}`, embeddingError);
+        logger.error(
+          `Failed to create text embedding for product ${product.id}`,
+          embeddingError
+        );
       }
     } else {
       logger.debug(`Skipping vector creation for product ${product.id}`, {
         existingVectorCount: existingVector ? existingVector.length : 0,
-        hasImageEmbedding: !!imageEmbedding
+        hasImageEmbedding: !!imageEmbedding,
       });
     }
 
@@ -391,9 +431,14 @@ async function populateProducts(filePath, multimodalProcessor) {
     for (let i = 0; i < batch.length; i++) {
       const product = batch[i];
       try {
-        await processProduct(product, multimodalProcessor, start + i + 1, batch.length);
+        await processProduct(
+          product,
+          multimodalProcessor,
+          start + i + 1,
+          batch.length
+        );
         // Add a small delay between processing
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
       } catch (processError) {
         logger.error(`Error processing product at index ${i}`, processError);
       }
@@ -406,7 +451,9 @@ async function populateProducts(filePath, multimodalProcessor) {
     logger.info("Final collection stats", stats);
 
     const savedProducts = await multimodalProcessor.listAllProducts();
-    logger.info("Total saved products", { count: savedProducts ? savedProducts.length : 0 });
+    logger.info("Total saved products", {
+      count: savedProducts ? savedProducts.length : 0,
+    });
   } catch (error) {
     logger.error("Error in populateProducts", error);
     throw error;
@@ -422,16 +469,16 @@ async function initializeDatabases() {
     // Connect to MongoDB
     await mongoose.connect(CONFIG.mongodb.uri, CONFIG.mongodb.options);
     logger.info("Connected to MongoDB");
-    
+
     // Initialize Milvus processor with the configuration
     const multimodalProcessor = new MultimodalProcessor(CONFIG.multimodal);
     await multimodalProcessor.init();
     await multimodalProcessor.initializeCollection();
-    
+
     // Test connection to Milvus
     await multimodalProcessor.testConnection();
     logger.info("Connected to Milvus");
-    
+
     // Test LLM connection
     const llmProvider = CONFIG.multimodal.llm.defaultProvider;
     const llmConnected = await multimodalProcessor.testLLMConnection();
@@ -440,7 +487,7 @@ async function initializeDatabases() {
     } else {
       logger.info(`Using fallback LLM provider (switched from ${llmProvider})`);
     }
-    
+
     return multimodalProcessor;
   } catch (error) {
     logger.error("Failed to initialize databases", error);
@@ -487,13 +534,13 @@ const cleanup = async () => {
     // Connect to databases
     await mongoose.connect(CONFIG.mongodb.uri, CONFIG.mongodb.options);
     logger.info("Connected to MongoDB");
-    
+
     multimodalProcessor = new MultimodalProcessor();
     await multimodalProcessor.init();
     await multimodalProcessor.initializeCollection();
     await multimodalProcessor.testConnection();
     logger.info("Connected to Milvus");
-    
+
     // Reset databases
     await resetDatabase(multimodalProcessor);
     logger.success("Database cleanup completed");

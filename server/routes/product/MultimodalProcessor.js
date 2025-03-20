@@ -3,6 +3,7 @@ const sharp = require("sharp");
 const axios = require("axios");
 const fs = require("fs").promises;
 const path = require("path");
+const { MultimodalConfig } = require("../../config/llm");
 
 // Error handling
 class AppError extends Error {
@@ -30,32 +31,8 @@ const logger = {
   },
 };
 
-// Default configuration object for LLM services
-const DEFAULT_CONFIG = {
-  llm: {
-    // Ollama service configuration
-    ollama: {
-      baseUrl: "http://192.168.4.106:11434",
-      models: {
-        multimodal: "gemma3:12b", // For image+text tasks
-        text: "gemma3:12b", // For text-only tasks
-        coder: "gemma3:12b", // For code-related tasks
-      },
-    },
-    // Which service to use by default
-    defaultProvider: "ollama",
-  },
-  milvus: {
-    address: "localhost:19530",
-    collection: "multimodal_collection_pwllm",
-  },
-  storage: {
-    baseImagePath:
-      process.env.IMAGE_STORAGE_PATH || path.join(process.cwd(), "uploads"),
-    maxImageSize: 5 * 1024 * 1024, // 5MB
-    allowedFormats: ["jpg", "jpeg", "png"],
-  },
-};
+// Using imported configuration
+const DEFAULT_CONFIG = MultimodalConfig;
 
 class MultimodalProcessor {
   constructor(config = {}) {
@@ -79,32 +56,20 @@ class MultimodalProcessor {
 
     // Log initialization
     console.log("MultimodalProcessor initialized with config:", {
-      llmProvider: this.config.llm.defaultProvider,
+      llmBaseUrl: this.config.llm.baseUrl,
       milvusAddress: this.config.milvus.address,
       collectionName: this.collectionName,
     });
   }
 
-  // Get the appropriate LLM service URL based on the current configuration
-  getLLMServiceUrl(endpoint = "chat/completions") {
-    const provider = this.config.llm.defaultProvider;
-    const baseUrl = this.config.llm[provider].baseUrl;
-
-    // Different endpoints for different providers
-    if (provider === "ollama") {
-      return `${baseUrl}/api/chat`;
-    }
-
-    return `${baseUrl}/v1/${endpoint}`;
+  // Get the LLM service URL 
+  getLLMServiceUrl() {
+    return `${this.config.llm.baseUrl}/api/chat`;
   }
 
-  // Get the appropriate model name for the task
-  getModelName(task = "text") {
-    const provider = this.config.llm.defaultProvider;
-    return (
-      this.config.llm[provider].models[task] ||
-      this.config.llm[provider].models.text
-    );
+  // Get the model name - always using gemma3:12b
+  getModelName() {
+    return this.config.llm.model;
   }
 
   async init() {
@@ -136,34 +101,19 @@ class MultimodalProcessor {
 
   // Test connection to LLM provider
   async testLLMConnection() {
-    const provider = this.config.llm.defaultProvider;
     try {
-      if (provider === "ollama") {
-        const response = await axios.get(
-          `${this.config.llm.ollama.baseUrl}/api/tags`
-        );
-        console.log(
-          `Connected to Ollama, available models: ${response.data.models.length}`
-        );
-      } else {
-        // Test alternative provider
-        const response = await axios.get(
-          `${this.config.llm.alternative.baseUrl}/v1/models`
-        );
-        console.log(
-          `Connected to alternative LLM provider, available models: ${response.data.data.length}`
-        );
-      }
+      const response = await axios.get(
+        `${this.config.llm.baseUrl}/api/tags`
+      );
+      console.log(
+        `Connected to Ollama, available models: ${response.data.models.length}`
+      );
       return true;
     } catch (error) {
       console.error(
-        `Failed to connect to LLM provider (${provider}):`,
+        `Failed to connect to Ollama LLM provider:`,
         error.message
       );
-      console.log("Attempting to switch to fallback provider...");
-      // Attempt to switch to fallback provider
-      this.config.llm.defaultProvider =
-        provider === "ollama" ? "alternative" : "ollama";
       return false;
     }
   }
@@ -283,94 +233,61 @@ class MultimodalProcessor {
   async generateCompletionSync(prompts) {
     console.log("generateCompletionSync(): prompts:", prompts);
 
-    const provider = this.config.llm.defaultProvider;
     let response;
 
     try {
-      if (provider === "ollama") {
-        // Format for Ollama API - need to handle the image format differently
-        // Check if any prompt contains an image
-        const hasImage = prompts.some((p) =>
-          p.content?.some?.((c) => c.type === "image_url")
-        );
-        const modelName = this.getModelName(hasImage ? "multimodal" : "text");
+      // Format for Ollama API - need to handle the image format differently
+      // Check if any prompt contains an image
+      const hasImage = prompts.some((p) =>
+        p.content?.some?.((c) => c.type === "image_url")
+      );
+      const modelName = this.getModelName();
 
-        console.log("generateCompletionSync(): using model:", modelName);
+      console.log("generateCompletionSync(): using model:", modelName);
 
-        if (hasImage) {
-          // For prompts with images, need to format them specifically for Ollama
-          const formattedPrompts = prompts.map((prompt) => {
-            if (Array.isArray(prompt.content)) {
-              // Format image content differently for Ollama
-              const textParts = [];
-              let imageBase64 = null;
+      if (hasImage) {
+        // For prompts with images, need to format them specifically for Ollama
+        const formattedPrompts = prompts.map((prompt) => {
+          if (Array.isArray(prompt.content)) {
+            // Format image content differently for Ollama
+            const textParts = [];
+            let imageBase64 = null;
 
-              prompt.content.forEach((content) => {
-                if (content.type === "text") {
-                  textParts.push(content.text);
-                } else if (
-                  content.type === "image_url" &&
-                  content.image_url?.url
-                ) {
-                  // Extract base64 data from the URL
-                  const base64Match = content.image_url.url.match(
-                    /^data:image\/[a-zA-Z]+;base64,(.+)$/
-                  );
-                  if (base64Match && base64Match[1]) {
-                    imageBase64 = base64Match[1];
-                  }
+            prompt.content.forEach((content) => {
+              if (content.type === "text") {
+                textParts.push(content.text);
+              } else if (
+                content.type === "image_url" &&
+                content.image_url?.url
+              ) {
+                // Extract base64 data from the URL
+                const base64Match = content.image_url.url.match(
+                  /^data:image\/[a-zA-Z]+;base64,(.+)$/
+                );
+                if (base64Match && base64Match[1]) {
+                  imageBase64 = base64Match[1];
                 }
-              });
-
-              // Return formatted content for Ollama
-              const formattedPrompt = {
-                role: prompt.role,
-                content: textParts.join("\n"),
-              };
-
-              // Add image if present
-              if (imageBase64) {
-                formattedPrompt.images = [imageBase64];
               }
+            });
 
-              return formattedPrompt;
+            // Return formatted content for Ollama
+            const formattedPrompt = {
+              role: prompt.role,
+              content: textParts.join("\n"),
+            };
+
+            // Add image if present
+            if (imageBase64) {
+              formattedPrompt.images = [imageBase64];
             }
-            return prompt;
-          });
 
-          console.log("Using Ollama multimodal format");
+            return formattedPrompt;
+          }
+          return prompt;
+        });
 
-          response = await axios({
-            method: "post",
-            url: this.getLLMServiceUrl(),
-            headers: {
-              "Content-Type": "application/json",
-            },
-            data: {
-              model: modelName,
-              messages: formattedPrompts,
-              temperature: 0.7,
-              stream: false,
-            },
-          });
-        } else {
-          // For text-only prompts, the format is simpler
-          response = await axios({
-            method: "post",
-            url: this.getLLMServiceUrl(),
-            headers: {
-              "Content-Type": "application/json",
-            },
-            data: {
-              model: modelName,
-              messages: prompts,
-              temperature: 0.7,
-              stream: false,
-            },
-          });
-        }
-      } else {
-        // Original/alternative provider format
+        console.log("Using Ollama multimodal format");
+
         response = await axios({
           method: "post",
           url: this.getLLMServiceUrl(),
@@ -378,13 +295,22 @@ class MultimodalProcessor {
             "Content-Type": "application/json",
           },
           data: {
-            model: this.getModelName(
-              prompts.some((p) =>
-                p.content?.some?.((c) => c.type === "image_url")
-              )
-                ? "multimodal"
-                : "text"
-            ),
+            model: modelName,
+            messages: formattedPrompts,
+            temperature: 0.7,
+            stream: false,
+          },
+        });
+      } else {
+        // For text-only prompts, the format is simpler
+        response = await axios({
+          method: "post",
+          url: this.getLLMServiceUrl(),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          data: {
+            model: modelName,
             messages: prompts,
             temperature: 0.7,
             stream: false,
@@ -398,21 +324,9 @@ class MultimodalProcessor {
       return output;
     } catch (error) {
       console.error(
-        `Error generating completion with ${provider}:`,
+        `Error generating completion with Ollama:`,
         error.message
       );
-
-      // If this is the first attempt and we haven't tried the fallback provider yet
-      if (!prompts._retried) {
-        console.log("Attempting with fallback provider...");
-        // Switch to fallback provider
-        this.config.llm.defaultProvider =
-          provider === "ollama" ? "alternative" : "ollama";
-        // Mark as retried to prevent infinite loop
-        prompts._retried = true;
-        // Try again with the new provider
-        return this.generateCompletionSync(prompts);
-      }
 
       throw error;
     }
@@ -469,10 +383,7 @@ class MultimodalProcessor {
       prompts.push(prompt);
 
       const output = await this.generateCompletionSync(prompts);
-      const responseContent =
-        this.config.llm.defaultProvider === "ollama"
-          ? output.message.content
-          : output.choices[0].message.content;
+      const responseContent = output.message.content;
 
       console.log("generateCaption(): image caption:", {
         caption: responseContent,
@@ -516,11 +427,7 @@ class MultimodalProcessor {
       const output = await this.generateCompletionSync(prompts);
       let vllmResponseText;
 
-      if (this.config.llm.defaultProvider === "ollama") {
-        vllmResponseText = output.message.content;
-      } else {
-        vllmResponseText = output.choices[0].message.content;
-      }
+      vllmResponseText = output.message.content;
 
       console.log(`Expanded "${text}" to: ${vllmResponseText}`);
       return vllmResponseText;

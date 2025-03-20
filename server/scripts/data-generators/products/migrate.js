@@ -1,13 +1,18 @@
+const dotenv = require("dotenv");
+dotenv.config();
+
+
 const mongoose = require("mongoose");
 const path = require("path");
 const Product = require("../../../routes/product/schema");
 const { parseProductsCSV } = require("./parse-products");
 const MultimodalProcessor = require("../../../routes/product/MultimodalProcessor");
+const { MultimodalConfig } = require("../../../config/llm");
 
 // Configuration
 const CONFIG = {
   mongodb: {
-    uri: process.env.MONGODB_URI || "mongodb://localhost:27017/pwllmstoredb",
+    uri: process.env.MONGODB_URI,
     options: {
       useNewUrlParser: true,
       useUnifiedTopology: true,
@@ -21,36 +26,8 @@ const CONFIG = {
     delayMs: parseInt(process.env.PROCESSING_DELAY_MS, 10) || 1000,
     concurrency: parseInt(process.env.PROCESSING_CONCURRENCY, 10) || 3,
   },
-  multimodal: {
-    // LLM provider configuration
-    llm: {
-      // Use environment variables with fallbacks
-      defaultProvider: process.env.LLM_DEFAULT_PROVIDER || "ollama",
-      ollama: {
-        baseUrl: process.env.OLLAMA_URL || "http://192.168.4.106:11434",
-        models: {
-          multimodal: process.env.OLLAMA_MODEL_MULTIMODAL || "gemma3:12b",
-          text: process.env.OLLAMA_MODEL_TEXT || "gemma3:12b",
-          coder: process.env.OLLAMA_MODEL_CODER || "gemma3:12b",
-        },
-      },
-    },
-    // Milvus configuration
-    milvus: {
-      address: process.env.MILVUS_ADDRESS || "localhost:19530",
-      collection:
-        process.env.MILVUS_COLLECTION || "multimodal_collection_pwllm",
-    },
-    // Storage configuration for images
-    storage: {
-      baseImagePath:
-        process.env.IMAGE_STORAGE_PATH || path.join(process.cwd(), "uploads"),
-      maxImageSize: parseInt(process.env.MAX_IMAGE_SIZE, 10) || 5 * 1024 * 1024,
-      allowedFormats: (
-        process.env.ALLOWED_IMAGE_FORMATS || "jpg,jpeg,png"
-      ).split(","),
-    },
-  },
+  // Use the imported multimodal configuration from common config file
+  multimodal: MultimodalConfig,
 };
 
 // Error handling
@@ -480,12 +457,11 @@ async function initializeDatabases() {
     logger.info("Connected to Milvus");
 
     // Test LLM connection
-    const llmProvider = CONFIG.multimodal.llm.defaultProvider;
     const llmConnected = await multimodalProcessor.testLLMConnection();
     if (llmConnected) {
-      logger.info(`Connected to LLM provider (${llmProvider})`);
+      logger.info(`Connected to Ollama LLM`);
     } else {
-      logger.info(`Using fallback LLM provider (switched from ${llmProvider})`);
+      logger.info(`Failed to connect to Ollama LLM`);
     }
 
     return multimodalProcessor;

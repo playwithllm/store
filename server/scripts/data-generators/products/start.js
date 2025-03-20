@@ -1,7 +1,13 @@
+const dotenv = require("dotenv");
+dotenv.config();
+
+const path = require("path");
 const { run } = require('./migrate');
 
-const filePath = "./products.csv";
+// Resolve path relative to the current script's location
+const filePath = path.resolve(__dirname, "./products-light.csv");
 console.log('Starting data generator...');
+console.log('Using file path:', filePath);
 
 // Wrap in an async IIFE to use await and better handle errors
 (async () => {

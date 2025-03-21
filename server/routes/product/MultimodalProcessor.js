@@ -873,22 +873,70 @@ class MultimodalProcessor {
 
   async searchByMetadata(metadata) {
     try {
-      const expr = `json_contains(metadata, '${JSON.stringify(metadata)}')`;
-      const results = await this.milvusClient.query({
-        collection_name: this.collectionName,
-        filter: expr,
-        output_fields: ["metadata"],
-        limit: 1,
-      });
-
-      console.log(
-        `searchByMetadata results for ${JSON.stringify(metadata)}:`,
-        results
-      );
-      return results;
+      logger.debug("Searching by metadata:", metadata);
+      
+      // Handle productId specifically, ensuring consistent type comparison
+      if (metadata.productId) {
+        // Convert to string for consistent comparison
+        const productIdString = String(metadata.productId);
+        
+        // First try a direct query on the collection (less restrictive)
+        logger.debug(`Searching for records with productId: ${productIdString}`);
+        
+        try {
+          // Get all products and filter client-side for more reliable matching
+          const allProducts = await this.listAllProducts(100);
+          
+          if (allProducts && allProducts.data) {
+            logger.debug(`Found ${allProducts.data.length} products in total, filtering for product ID: ${productIdString}`);
+            
+            // Manually filter for exact productId match
+            const exactMatches = allProducts.data.filter(item => 
+              item.metadata && 
+              item.metadata.productId && 
+              String(item.metadata.productId) === productIdString
+            );
+            
+            logger.debug(`Found ${exactMatches.length} exact matches for productId: ${productIdString}`);
+            
+            if (exactMatches.length > 0) {
+              return exactMatches;
+            }
+          }
+        } catch (listError) {
+          logger.error("Error listing all products:", listError);
+        }
+        
+        // Fallback to direct JSON query if needed
+        const expr = `JSON_CONTAINS(metadata, JSON_OBJECT("productId", "${productIdString}"))`;
+        logger.debug(`Using fallback expression: ${expr}`);
+        
+        const results = await this.milvusClient.query({
+          collection_name: this.collectionName,
+          filter: expr,
+          output_fields: ["metadata"],
+          limit: 10,
+        });
+        
+        return results.data || [];
+      } else {
+        // For other metadata searches (not by productId)
+        const expr = `JSON_CONTAINS(metadata, '${JSON.stringify(metadata)}')`;
+        logger.debug(`Searching with generic expression: ${expr}`);
+        
+        const results = await this.milvusClient.query({
+          collection_name: this.collectionName,
+          filter: expr,
+          output_fields: ["metadata"],
+          limit: 10,
+        });
+        
+        return results.data || [];
+      }
     } catch (error) {
       logger.error("Error searching by metadata:", error);
-      throw error;
+      // Don't throw, return empty array to allow processing to continue
+      return [];
     }
   }
 

@@ -5,7 +5,7 @@ const path = require("path");
  */
 const LLMConfig = {
   // Ollama service configuration
-  baseUrl: process.env.OLLAMA_URL || "http://192.168.4.106:11434",
+  baseUrl: process.env.OLLAMA_URL,
   model: process.env.OLLAMA_MODEL || "gemma3:12b",
 };
 

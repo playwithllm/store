@@ -19,7 +19,7 @@ const CONFIG = {
     },
   },
   batch: {
-    start: parseInt(process.env.BATCH_START, 10) || 0,
+    start: parseInt(process.env.BATCH_START, 10) || 2000,
     size: parseInt(process.env.BATCH_SIZE, 10) || 10000,
   },
   processing: {
@@ -210,6 +210,9 @@ async function storeProductVector(
   imageEmbedding
 ) {
   try {
+    // Ensure product.id is stored as string for consistent comparison later
+    const productId = String(product.id);
+    
     const insertData = {
       collection_name: multimodalProcessor.collectionName,
       fields_data: [
@@ -218,7 +221,7 @@ async function storeProductVector(
           product_name_vector: textEmbedding,
           image_vector: imageEmbedding,
           metadata: {
-            productId: product.id,
+            productId: productId, // Store as string
             created_at: new Date().toISOString(),
           },
         },
@@ -230,7 +233,7 @@ async function storeProductVector(
       collection_names: [multimodalProcessor.collectionName],
     });
 
-    logger.success(`Vector embedding stored for product ${product.id}`, {
+    logger.success(`Vector embedding stored for product ${productId}`, {
       IDs,
     });
     return IDs;
@@ -257,35 +260,26 @@ function generateUniqueId() {
  */
 async function processProduct(product, multimodalProcessor, index, total) {
   try {
+    // Ensure product.id is a string for consistent comparison
+    const productId = String(product.id);
+    
     logger.info(`Processing product ${index} of ${total}`, {
-      id: product.id,
+      id: productId,
       name: product.name,
     });
 
     // Check if product already exists in both databases
-    const existingProduct = await Product.findOne({ sourceId: product.id });
+    const existingProduct = await Product.findOne({ sourceId: productId });    
 
-    logger.debug(`Checking if product exists in Milvus: ${product.id}`);
-    let existingVector = [];
-    try {
-      existingVector = await multimodalProcessor.searchByMetadata({
-        productId: product.id,
-      });
-    } catch (searchError) {
-      logger.error(
-        `Error searching Milvus for product ${product.id}`,
-        searchError
-      );
-    }
-
-    logger.debug(`Product ${product.id} existence check:`, {
-      existsInMongoDB: !!existingProduct,
-      existsInMilvus: existingVector && existingVector.length > 0,
+    // Improved existence check logging
+    const existsInMongoDB = !!existingProduct;    
+    logger.debug(`Product ${productId} existence check:`, {
+      existsInMongoDB,
     });
 
-    if (existingProduct && existingVector && existingVector.length > 0) {
+    if (existingProduct) {
       logger.info(
-        `Product ${product.id} already exists in both databases, skipping`
+        `Product ${productId} already exists in MongoDB, skipping`
       );
       return;
     }
@@ -296,7 +290,7 @@ async function processProduct(product, multimodalProcessor, index, total) {
       (product.images && product.images.length > 0 ? product.images[0] : null);
 
     // Process image and get analysis
-    logger.debug(`Starting image processing for product ${product.id}`, {
+    logger.debug(`Starting image processing for product ${productId}`, {
       hasImage: !!imageUrl,
       imagePath: imageUrl,
     });
@@ -307,14 +301,14 @@ async function processProduct(product, multimodalProcessor, index, total) {
       productWithImage
     );
 
-    logger.debug(`Image processing results for product ${product.id}:`, {
+    logger.debug(`Image processing results for product ${productId}:`, {
       hasCaption: !!basicCaption,
       hasEmbedding: !!imageEmbedding,
     });
 
     // Create MongoDB document if needed
     if (!existingProduct) {
-      logger.debug(`Creating MongoDB document for product ${product.id}`);
+      logger.debug(`Creating MongoDB document for product ${productId}`);
       const mongoProduct = {
         ...product,
         image: imageUrl,
@@ -325,7 +319,7 @@ async function processProduct(product, multimodalProcessor, index, total) {
     }
 
     // Store vector embedding if needed
-    if ((!existingVector || !existingVector.length) && imageEmbedding) {
+    if (imageEmbedding) {
       // Create text embedding from product data
       const textToEmbed = [
         product.name,
@@ -337,7 +331,7 @@ async function processProduct(product, multimodalProcessor, index, total) {
         .filter(Boolean)
         .join(" | ");
 
-      logger.debug(`Creating text embedding for product ${product.id}`, {
+      logger.debug(`Creating text embedding for product ${productId}`, {
         text: textToEmbed,
       });
 
@@ -347,7 +341,7 @@ async function processProduct(product, multimodalProcessor, index, total) {
           false
         );
 
-        logger.debug(`Text embedding created for product ${product.id}`, {
+        logger.debug(`Text embedding created for product ${productId}`, {
           embeddingLength: textEmbedding ? textEmbedding.length : 0,
         });
 
@@ -360,12 +354,12 @@ async function processProduct(product, multimodalProcessor, index, total) {
         );
       } catch (embeddingError) {
         logger.error(
-          `Failed to create text embedding for product ${product.id}`,
+          `Failed to create text embedding for product ${productId}`,
           embeddingError
         );
       }
     } else {
-      logger.debug(`Skipping vector creation for product ${product.id}`, {
+      logger.debug(`Skipping vector creation for product ${productId}`, {
         existingVectorCount: existingVector ? existingVector.length : 0,
         hasImageEmbedding: !!imageEmbedding,
       });

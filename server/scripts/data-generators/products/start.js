@@ -5,6 +5,7 @@ const path = require("path");
 const { run } = require('./migrate');
 
 // Resolve path relative to the current script's location
+// const filePath = path.resolve(__dirname, "./products.csv");
 const filePath = path.resolve(__dirname, "./products-light.csv");
 console.log('Starting data generator...');
 console.log('Using file path:', filePath);

@@ -7,7 +7,10 @@
     "dev": "nodemon index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "migrate:up": "node scripts/data-generators/products/start.js",
-    "migrate:reset": "node scripts/data-generators/products/reset.js"
+    "migrate:reset": "node scripts/data-generators/products/reset.js",
+    "migrate:reset-and-up": "node scripts/data-generators/products/reset-and-migrate.js",
+    "infra:up": "docker compose -f docker/docker-compose-milvus.yml up -d",
+    "infra:down": "docker compose -f docker/docker-compose-milvus.yml down"
   },
   "keywords": [],
   "author": "",

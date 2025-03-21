@@ -5,20 +5,35 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "migrate:up": "node scripts/data-generators/products/start.js",
+    "migrate:reset": "node scripts/data-generators/products/reset.js",
+    "migrate:reset-and-up": "node scripts/data-generators/products/reset-and-migrate.js",
+    "infra:up": "docker compose -f docker/docker-compose-milvus.yml up -d",
+    "infra:down": "docker compose -f docker/docker-compose-milvus.yml down"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@xenova/transformers": "^2.17.2",
+    "@zilliz/milvus2-sdk-node": "^2.5.6",
+    "axios": "^1.8.3",
     "body-parser": "^1.20.3",
     "cors": "^2.8.5",
+    "csv-parse": "^5.6.0",
+    "csv-parser": "^3.2.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
+    "fs-extra": "^11.3.0",
     "helmet": "^8.0.0",
-    "morgan": "^1.10.0"
+    "mongoose": "^8.12.1",
+    "morgan": "^1.10.0",
+    "node-fetch": "^3.3.2",
+    "path": "^0.12.7",
+    "sharp": "^0.33.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.9"

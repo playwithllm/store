@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { 
-  Container, 
-  Grid, 
-  Typography, 
-  Box, 
-  Button, 
-  CircularProgress, 
+import {
+  Container,
+  Grid,
+  Typography,
+  Box,
+  Button,
+  CircularProgress,
   Fade,
   Alert,
   Divider
@@ -16,30 +16,11 @@ import { Product, fetchProducts, getMoreProducts, searchProducts } from '../data
 
 const Home = () => {
   const [displayedProducts, setDisplayedProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchResults, setSearchResults] = useState<Product[] | null>(null);
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Initialize with products from the server
-    const getInitialProducts = async () => {
-      setIsLoading(true);
-      try {
-        const initialProducts = await fetchProducts();
-        setDisplayedProducts(initialProducts.slice(0, 8));
-        setError(null);
-      } catch (err) {
-        console.error('Failed to fetch initial products:', err);
-        setError('Failed to load products. Please try again later.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    getInitialProducts();
-  }, []);
 
   const handleLoadMore = async () => {
     setLoadingMore(true);
@@ -55,27 +36,15 @@ const Home = () => {
     }
   };
 
-  const handleSearch = async (query: string) => {
-    if (query.trim() === '') {
+  const handleSearch = async (results: Product[]) => {
+    if (!results) {
       setIsSearchMode(false);
       setSearchResults(null);
       return;
     }
-    
+
     setIsSearchMode(true);
-    setIsLoading(true);
-    
-    try {
-      const results = await searchProducts(query);
-      setSearchResults(results);
-      setError(null);
-    } catch (err) {
-      console.error('Error searching products:', err);
-      setError('Failed to search products. Please try again later.');
-      setSearchResults([]);
-    } finally {
-      setIsLoading(false);
-    }
+    setSearchResults(results);
   };
 
   const handleImageSearch = (results: Product[]) => {
@@ -95,15 +64,15 @@ const Home = () => {
     <Container maxWidth="lg">
       <Box textAlign="center" mb={6}>
         <Typography variant="h3" component="h1" gutterBottom fontWeight="bold">
-          Shop the Latest Products
+          Search the Latest Products
         </Typography>
         <Typography variant="subtitle1" color="text.secondary" mb={4}>
           Discover amazing deals on our top-quality products
         </Typography>
       </Box>
 
-      <SearchBar onSearch={handleSearch} onImageSearch={handleImageSearch} />
-      
+      <SearchBar onSearch={handleSearch} onImageSearch={handleImageSearch} handleClearSearch={handleClearSearch} />
+
       {error && (
         <Alert severity="error" sx={{ mb: 4 }}>
           {error}
@@ -113,8 +82,8 @@ const Home = () => {
       {isSearchMode && !isLoading && (
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h6">
-            {searchResults?.length === 0 
-              ? 'No products found' 
+            {searchResults?.length === 0
+              ? 'No products found'
               : `Found ${searchResults?.length} product${searchResults && searchResults.length !== 1 ? 's' : ''}`}
           </Typography>
           <Button variant="outlined" onClick={handleClearSearch}>
@@ -144,8 +113,8 @@ const Home = () => {
           </Grid>
         </Fade>
       )}
-      
-      {!isLoading && !isSearchMode && (
+
+      {/* {!isLoading && !isSearchMode && (
         <Box display="flex" justifyContent="center" mt={6} mb={4}>
           <Button 
             variant="contained" 
@@ -165,11 +134,11 @@ const Home = () => {
             )}
           </Button>
         </Box>
-      )}
+      )} */}
 
       <Divider sx={{ my: 6 }} />
-      
-      <Box textAlign="center" mb={8}>
+
+      {/* <Box textAlign="center" mb={8}>
         <Typography variant="h4" component="h2" gutterBottom>
           Why Shop With Us?
         </Typography>
@@ -205,7 +174,7 @@ const Home = () => {
             </Box>
           </Grid>
         </Grid>
-      </Box>
+      </Box> */}
     </Container>
   );
 };

@@ -44,3 +44,14 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+
+# Ignore the public directory
+public/
+
+# migration data
+products.csv
+uploads/
+
+.minio.sys
+volumes

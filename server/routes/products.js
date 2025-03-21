@@ -1,175 +1,233 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
+const Product = require("./product/schema");
+const MultimodalProcessor = require("./product/MultimodalProcessor");
+const mongoose = require("mongoose");
 
-// Hardcoded products data
-const products = [
-  {
-    id: 1,
-    name: "Premium Wireless Headphones",
-    description: "High-quality wireless headphones with noise cancellation technology and long battery life.",
-    price: 199.99,
-    category: "Electronics",
-    image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=400",
-    rating: { rate: 4.8, count: 156 },
-    inStock: true,
-    features: ["Noise Cancellation", "40-hour Battery", "Bluetooth 5.0", "Voice Assistant Compatible"]
-  },
-  {
-    id: 2,
-    name: "Ergonomic Office Chair",
-    description: "Comfortable ergonomic office chair with adjustable features for optimal posture.",
-    price: 249.99,
-    category: "Furniture",
-    image: "https://images.unsplash.com/photo-1580480055273-228ff5388ef8?q=80&w=400",
-    rating: { rate: 4.5, count: 89 },
-    inStock: true,
-    features: ["Adjustable Height", "Lumbar Support", "360° Swivel", "Breathable Mesh Back"]
-  },
-  {
-    id: 3,
-    name: "Smartphone Pro Max",
-    description: "Latest smartphone with advanced camera and high-performance processor.",
-    price: 899.99,
-    category: "Electronics",
-    image: "https://images.unsplash.com/photo-1598327105666-5b89351aff97?q=80&w=400",
-    rating: { rate: 4.7, count: 245 },
-    inStock: true,
-    features: ["6.7-inch OLED Display", "Triple Camera System", "5G Compatible", "All-Day Battery Life"]
-  },
-  {
-    id: 4,
-    name: "Smart Fitness Watch",
-    description: "Track your fitness goals with this advanced smartwatch featuring health monitoring.",
-    price: 149.99,
-    category: "Wearables",
-    image: "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?q=80&w=400",
-    rating: { rate: 4.3, count: 117 },
-    inStock: true,
-    features: ["Heart Rate Monitor", "Sleep Tracking", "GPS", "Water Resistant"]
-  },
-  {
-    id: 5,
-    name: "Portable Bluetooth Speaker",
-    description: "Powerful portable speaker with exceptional sound quality and waterproof design.",
-    price: 79.99,
-    category: "Electronics",
-    image: "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?q=80&w=400",
-    rating: { rate: 4.4, count: 78 },
-    inStock: false,
-    features: ["Waterproof", "10-hour Battery Life", "Built-in Microphone", "Compact Design"]
-  },
-  {
-    id: 6,
-    name: "Stainless Steel Water Bottle",
-    description: "Eco-friendly insulated water bottle that keeps beverages hot or cold for hours.",
-    price: 24.99,
-    category: "Kitchen",
-    image: "https://images.unsplash.com/photo-1523362628745-0c100150b504?q=80&w=400",
-    rating: { rate: 4.9, count: 203 },
-    inStock: true,
-    features: ["24-hour Insulation", "BPA Free", "Leak-proof Cap", "Eco-friendly"]
-  },
-  {
-    id: 7,
-    name: "Wireless Charging Pad",
-    description: "Convenient wireless charger compatible with the latest smartphones and earbuds.",
-    price: 29.99,
-    category: "Electronics",
-    image: "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?q=80&w=400",
-    rating: { rate: 4.2, count: 65 },
-    inStock: true,
-    features: ["Fast Charging", "Multi-device Compatible", "LED Indicator", "Slim Design"]
-  },
-  {
-    id: 8,
-    name: "Smart Home Security Camera",
-    description: "HD security camera with motion detection and night vision for home monitoring.",
-    price: 119.99,
-    category: "Home Security",
-    image: "https://images.unsplash.com/photo-1555664424-778a1e5e1b48?q=80&w=400",
-    rating: { rate: 4.6, count: 112 },
-    inStock: true,
-    features: ["1080p HD Video", "Night Vision", "Motion Detection", "Two-way Audio"]
+const model = "Product";
+
+// Error handling
+class AppError extends Error {
+  constructor(message, details) {
+    super(message);
+    this.name = "AppError";
+    this.details = details;
   }
-];
+}
+
+// Logger
+const logger = {
+  info: (message, data = {}) => {
+    console.log(`[INFO] ${message}`, data);
+  },
+  error: (message, error) => {
+    console.error(`[ERROR] ${message}`, error);
+  },
+  success: (message, data = {}) => {
+    console.log(`[SUCCESS] ${message}`, data);
+  },
+  debug: (message, data = {}) => {
+    // Always log debug messages during troubleshooting
+    console.log(`[DEBUG] ${message}`, data);
+  }
+};
+
+
+const getAll = async (query) => {
+  try {
+    const { keyword } = query;
+    const filter = {};
+    if (keyword) {
+      filter.$or = [
+        { name: { $regex: keyword, $options: "i" } },
+        { category: { $regex: keyword, $options: "i" } },
+      ];
+    }
+
+    // pick 20 even though it says getAll
+
+    const items = await Product.find(filter).limit(20);
+    logger.info(`getAll(): ${model} fetched`, { count: items.length });
+    return items;
+  } catch (error) {
+    logger.error(`getAll(): Failed to get ${model}`, error);
+    throw new AppError(`Failed to get ${model}`, error.message);
+  }
+};
+
+const ragSearch = async (queryObject) => {
+  try {
+    if (!queryObject) {
+      return getAll({});
+    }
+
+    const { keyword: query } = queryObject;
+    if (!query) {
+      return getAll({});
+    }
+
+    const searchText = String(query).trim();
+    logger.info(`ragSearch(): ${model} searched`, {
+      query: searchText,
+    });
+    
+    // Create and initialize MultimodalProcessor with enhanced logging
+    const multimodalProcessor = new MultimodalProcessor();
+    await multimodalProcessor.init();
+    await multimodalProcessor.initializeCollection();
+    
+    // Test connection to Milvus
+    const isConnected = await multimodalProcessor.testConnection();
+    if (!isConnected) {
+      logger.warn(`ragSearch(): Failed to connect to Milvus`);
+      return getAll({ keyword: searchText }); // Fallback to regular text search
+    }
+    
+    // Modify search parameters based on query characteristics
+    let limit = 10;
+    let useHybridSearch = true;
+    
+    // If query is very short (1-2 words), increase result limit for better coverage
+    if (searchText.split(/\s+/).length <= 2) {
+      limit = 16;
+      logger.debug("Using increased limit for short query");
+    }
+    
+    // Handle specific query types differently
+    if (searchText.length >= 30) {
+      // Long queries likely have more specific intent
+      limit = 8;
+      logger.debug("Using decreased limit for long, specific query");
+    }
+    
+    // Perform RAG search with optimized parameters
+    const results = await multimodalProcessor.ragSearch(
+      Product,
+      searchText,
+      limit
+    );
+
+    if (!results || results.length === 0) {
+      logger.warn(`ragSearch(): No results found, falling back to keyword search`);
+      return getAll({ keyword: searchText }); // Fallback to regular text search
+    }
+
+    logger.info(`ragSearch(): ${model} searched successfully`, {
+      query: searchText,
+      resultCount: results.length,
+      // Log search method distribution for analysis
+      methodCounts: results.reduce((counts, product) => {
+        const method = product._searchMethod || 'unknown';
+        counts[method] = (counts[method] || 0) + 1;
+        return counts;
+      }, {})
+    });
+
+    return results;
+  } catch (error) {
+    logger.error(`ragSearch(): Failed to search ${model}`, error);
+    throw new AppError(`Failed to search ${model}`, error.message);
+  }
+};
 
 /**
  * @route   GET /api/products
  * @desc    Get all products with optional filtering
  * @access  Public
  */
-router.get('/', (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const { category, inStock, minPrice, maxPrice } = req.query;
-    
-    // Apply filters if provided
-    let filteredProducts = [...products];
-    
+
+    // Build filter object for MongoDB query
+    const filter = {};
+
     if (category) {
-      filteredProducts = filteredProducts.filter(
-        product => product.category.toLowerCase() === category.toLowerCase()
-      );
+      // Using case-insensitive regex for category filtering
+      filter.category = { $regex: new RegExp(category, "i") };
     }
-    
+
     if (inStock !== undefined) {
-      const stockValue = inStock === 'true';
-      filteredProducts = filteredProducts.filter(product => product.inStock === stockValue);
+      filter.inStock = inStock === "true";
     }
-    
+
     if (minPrice !== undefined) {
-      filteredProducts = filteredProducts.filter(
-        product => product.price >= parseFloat(minPrice)
-      );
+      filter.price = filter.price || {};
+      filter.price.$gte = parseFloat(minPrice);
     }
-    
+
     if (maxPrice !== undefined) {
-      filteredProducts = filteredProducts.filter(
-        product => product.price <= parseFloat(maxPrice)
-      );
+      filter.price = filter.price || {};
+      filter.price.$lte = parseFloat(maxPrice);
     }
-    
+
+    // Fetch products from MongoDB with filters
+    const products = await Product.find(filter);
+
     res.json({
       success: true,
-      count: filteredProducts.length,
-      data: filteredProducts
+      count: products.length,
+      data: products,
     });
   } catch (error) {
-    console.error('Error getting products:', error);
+    console.error("Error getting products:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to retrieve products',
-      error: process.env.NODE_ENV === 'production' ? {} : error
+      message: "Failed to retrieve products",
+      error: process.env.NODE_ENV === "production" ? {} : error,
     });
   }
 });
+
+router.get(
+  "/search",
+  async (req, res, next) => {
+    try {
+      const items = await ragSearch(req.query);
+      res.json(items);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 /**
  * @route   GET /api/products/:id
  * @desc    Get a single product by ID
  * @access  Public
  */
-router.get('/:id', (req, res) => {
+router.get("/:id", async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
-    const product = products.find(p => p.id === id);
-    
+    const id = req.params.id;
+
+    // First try to find by MongoDB _id if it's a valid ObjectId
+    let product;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      product = await Product.findById(id);
+    }
+
+    // If not found, try to find by sourceId
+    if (!product) {
+      product = await Product.findOne({ sourceId: id });
+    }
+
     if (!product) {
       return res.status(404).json({
         success: false,
-        message: `Product with id ${id} not found`
+        message: `Product with id ${id} not found`,
       });
     }
-    
+
     res.json({
       success: true,
-      data: product
+      data: product,
     });
   } catch (error) {
-    console.error('Error getting product by ID:', error);
+    console.error("Error getting product by ID:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to retrieve the product',
-      error: process.env.NODE_ENV === 'production' ? {} : error
+      message: "Failed to retrieve the product",
+      error: process.env.NODE_ENV === "production" ? {} : error,
     });
   }
 });
@@ -179,31 +237,33 @@ router.get('/:id', (req, res) => {
  * @desc    Get products by category
  * @access  Public
  */
-router.get('/category/:category', (req, res) => {
+router.get("/category/:category", async (req, res) => {
   try {
     const category = req.params.category;
-    const categoryProducts = products.filter(
-      p => p.category.toLowerCase() === category.toLowerCase()
-    );
-    
+
+    // Using case-insensitive regex for category matching
+    const categoryProducts = await Product.find({
+      category: { $regex: new RegExp(category, "i") },
+    });
+
     if (categoryProducts.length === 0) {
       return res.status(404).json({
         success: false,
-        message: `No products found in category "${category}"`
+        message: `No products found in category "${category}"`,
       });
     }
-    
+
     res.json({
       success: true,
       count: categoryProducts.length,
-      data: categoryProducts
+      data: categoryProducts,
     });
   } catch (error) {
-    console.error('Error getting products by category:', error);
+    console.error("Error getting products by category:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to retrieve products by category',
-      error: process.env.NODE_ENV === 'production' ? {} : error
+      message: "Failed to retrieve products by category",
+      error: process.env.NODE_ENV === "production" ? {} : error,
     });
   }
 });

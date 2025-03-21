@@ -5,12 +5,19 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const bodyParser = require('body-parser');
 const dotenv = require('dotenv');
+const mongoose = require('mongoose');
 
 // Import routes
 const productRoutes = require('./routes/products');
 
 // Load environment variables
 dotenv.config();
+
+// MongoDB Connection
+const MONGODB_URI = process.env.MONGODB_URI;
+mongoose.connect(MONGODB_URI)
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
 const app = express();
 const PORT = process.env.PORT || 4001;
@@ -22,8 +29,8 @@ app.use(helmet());
 // CORS setup
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? 'https://your-production-domain.com' 
-    : ['http://localhost:5173', 'http://localhost:8080', 'http://127.0.0.1:5173'],
+    ? 'https://app.playwithllm.com' 
+    : ['http://localhost:8080', 'http://192.168.4.28:8080', 'http://192.168.4.106:8080', 'https://app.playwithllm.com'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));

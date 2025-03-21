@@ -1,64 +1,61 @@
-
 import { useState } from 'react';
-import { 
-  Paper, 
-  InputBase, 
-  IconButton, 
-  Divider, 
+import {
+  Paper,
+  InputBase,
+  IconButton,
+  Divider,
   Box,
   CircularProgress,
-  Typography 
+  Typography
 } from '@mui/material';
-import { 
-  Search as SearchIcon, 
+import {
+  Search as SearchIcon,
   Image as ImageIcon,
   Clear as ClearIcon
 } from '@mui/icons-material';
-import { imageSearchProducts } from '../data/products';
+import { Product, imageSearchProducts, ragSearchProducts } from '../data/products';
 
 interface SearchBarProps {
-  onSearch: (query: string) => void;
-  onImageSearch: (results: any[]) => void;
+  onSearch: (results: Product[]) => void;
+  onImageSearch: (results: Product[]) => void;
+  handleClearSearch: () => void;
 }
 
-const SearchBar = ({ onSearch, onImageSearch }: SearchBarProps) => {
+const SearchBar = ({ onSearch, onImageSearch, handleClearSearch }: SearchBarProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleTextSearch = () => {
+  const handleTextSearch = async () => {
     if (searchQuery.trim()) {
-      onSearch(searchQuery);
+      setIsLoading(true);
+      try {
+        const results = await ragSearchProducts(searchQuery);
+        onSearch(results);
+      } catch (error) {
+        console.error('Error in text search:', error);
+      } finally {
+        setIsLoading(false);
+      }
     }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleTextSearch();
-    }
-  };
-
-  const handleClearSearch = () => {
-    setSearchQuery('');
-    onSearch('');
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      
+
       // Check file type
       if (!file.type.match('image.*')) {
         alert('Please upload an image file');
         return;
       }
-      
+
       // Check file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         alert('Image should be less than 5MB');
         return;
       }
-      
+
       setSelectedImage(file);
       processImageSearch(file);
     }
@@ -67,13 +64,13 @@ const SearchBar = ({ onSearch, onImageSearch }: SearchBarProps) => {
   const processImageSearch = async (file: File) => {
     setIsLoading(true);
     try {
-      // In a real app, this would send the image to a server for visual search
       const results = await imageSearchProducts(file);
       onImageSearch(results);
     } catch (error) {
       console.error('Error processing image search:', error);
     } finally {
       setIsLoading(false);
+      setSelectedImage(null);
     }
   };
 
@@ -89,62 +86,72 @@ const SearchBar = ({ onSearch, onImageSearch }: SearchBarProps) => {
         mb: 4,
         borderRadius: 2
       }}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (searchQuery.trim()) {
+          handleTextSearch();
+        }
+      }}
     >
       <InputBase
         sx={{ ml: 1, flex: 1 }}
         placeholder="Search for products..."
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
-        onKeyPress={handleKeyPress}
         inputProps={{ 'aria-label': 'search products' }}
+        disabled={isLoading}
       />
-      
+
       {searchQuery && (
-        <IconButton 
-          aria-label="clear search" 
-          onClick={handleClearSearch}
+        <IconButton
+          aria-label="clear search"
+          onClick={() => { handleClearSearch(); setSearchQuery(''); }}
           sx={{ p: '10px' }}
+          disabled={isLoading}
         >
           <ClearIcon />
         </IconButton>
       )}
-      
-      <IconButton 
-        type="button" 
-        sx={{ p: '10px' }} 
+
+      <IconButton
+        type="button"
+        sx={{ p: '10px' }}
         aria-label="search"
         onClick={handleTextSearch}
+        disabled={isLoading}
       >
-        <SearchIcon />
+        {isLoading ? <CircularProgress size={24} /> : <SearchIcon />}
       </IconButton>
-      
+
       <Divider sx={{ height: 28, m: 0.5 }} orientation="vertical" />
-      
-      <Box sx={{ position: 'relative' }}>
-        <input
-          accept="image/*"
-          type="file"
-          id="image-upload"
-          onChange={handleImageUpload}
-          style={{ display: 'none' }}
-        />
-        <label htmlFor="image-upload">
-          <IconButton 
-            color="primary" 
-            aria-label="upload image for search" 
-            component="span"
-            sx={{ p: '10px' }}
-            disabled={isLoading}
-          >
-            {isLoading ? <CircularProgress size={24} /> : <ImageIcon />}
-          </IconButton>
-        </label>
-        {selectedImage && !isLoading && (
-          <Typography variant="caption" sx={{ position: 'absolute', bottom: -20, right: 0, whiteSpace: 'nowrap' }}>
-            Image selected
+
+      <input
+        type="file"
+        accept="image/*"
+        id="image-upload"
+        style={{ display: 'none' }}
+        onChange={handleImageUpload}
+        disabled={isLoading}
+      />
+
+      <IconButton
+        color="primary"
+        aria-label="upload picture"
+        component="label"
+        htmlFor="image-upload"
+        sx={{ p: '10px' }}
+        disabled={isLoading}
+      >
+        <ImageIcon />
+      </IconButton>
+
+      {selectedImage && (
+        <Box sx={{ px: 2 }}>
+          <Typography variant="caption" color="textSecondary">
+            {selectedImage.name}
           </Typography>
-        )}
-      </Box>
+        </Box>
+      )}
     </Paper>
   );
 };

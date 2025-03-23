@@ -40,6 +40,15 @@ const SearchBar = ({ onSearch, onImageSearch, handleClearSearch }: SearchBarProp
     }
   };
 
+  const convertToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
+  };
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -64,7 +73,9 @@ const SearchBar = ({ onSearch, onImageSearch, handleClearSearch }: SearchBarProp
   const processImageSearch = async (file: File) => {
     setIsLoading(true);
     try {
-      const results = await imageSearchProducts(file);
+      // Convert image to base64 before sending to the server
+      const base64Image = await convertToBase64(file);
+      const results = await imageSearchProducts(base64Image);
       onImageSearch(results);
     } catch (error) {
       console.error('Error processing image search:', error);

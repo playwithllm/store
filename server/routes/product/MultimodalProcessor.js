@@ -112,7 +112,8 @@ class MultimodalProcessor {
     } catch (error) {
       console.error(
         `Failed to connect to Ollama LLM provider:`,
-        error.message
+        error.message,
+        this.config.llm.baseUrl
       );
       return false;
     }

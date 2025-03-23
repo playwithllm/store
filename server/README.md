@@ -189,6 +189,18 @@ If image processing fails:
 - Ensure the uploads directory exists and has write permissions
 - Check if Sharp is properly installed
 
-## Docker result
+## Screenshots
+
+### Infra
 
 ![image](https://github.com/user-attachments/assets/2a12c46c-3a0a-4235-8d01-fc2edc307127)
+
+
+### Server
+
+![image](https://github.com/user-attachments/assets/07ea664f-2c30-45a8-87fa-7a4ca2ae3f46)
+
+
+### Client
+
+![image](https://github.com/user-attachments/assets/b1be14df-471c-4490-a6fe-f4bbd781146c)

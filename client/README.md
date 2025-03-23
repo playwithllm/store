@@ -1,69 +1,68 @@
-# Welcome to your Lovable project
+# React Client App
 
-## Project info
+This is a React application built with Vite for a store project.
 
-**URL**: https://lovable.dev/projects/40b38a3c-520a-40f3-b381-c7d2016b412a
+## Getting Started
 
-## How can I edit this code?
+These instructions will help you set up and run the project on your local machine.
 
-There are several ways of editing your application.
+### Prerequisites
 
-**Use Lovable**
+- Node.js and npm (or bun) - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/40b38a3c-520a-40f3-b381-c7d2016b412a) and start prompting.
+### Environment Setup
 
-Changes made via Lovable will be committed automatically to this repo.
+1. Create a `.env.development` file in the root directory:
+   ```
+   # Copy from .env.example and update the server URL
+   ```
 
-**Use your preferred IDE**
+2. Update the server URL in your `.env.development` file to point to your backend service.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+### Installation and Running
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Step 1: Clone the repository
+git clone <YOUR_REPOSITORY_URL>
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Step 2: Navigate to the client directory
+cd <PROJECT_PATH>/client
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Step 3: Install dependencies
+npm install
+# or if using bun
+bun install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Step 4: Start the development server
 npm run dev
+# or with bun
+bun run dev
 ```
 
-**Edit a file directly in GitHub**
+## Project Structure
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+This client application follows a standard React/Vite project structure:
 
-**Use GitHub Codespaces**
+- `src/` - Contains all the source code
+  - `components/` - Reusable UI components
+  - `context/` - React contexts for state management
+  - `data/` - Static data files
+  - `hooks/` - Custom React hooks
+  - `lib/` - Utility functions and libraries
+  - `pages/` - Page components
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Technologies
 
-## What technologies are used for this project?
+This project is built with:
 
-This project is built with .
+- [Vite](https://vitejs.dev/) - Fast development environment
+- [React](https://reactjs.org/) - UI library
+- [TypeScript](https://www.typescriptlang.org/) - Type safety
+- [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
+- [shadcn/ui](https://ui.shadcn.com/) - UI component library
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Initial project setup
 
-## How can I deploy this project?
+The initial version was made in Lovable.
 
-Simply open [Lovable](https://lovable.dev/projects/40b38a3c-520a-40f3-b381-c7d2016b412a) and click on Share -> Publish.
-
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+**URL**: https://lovable.dev/projects/40b38a3c-520a-40f3-b381-c7d2016b412a

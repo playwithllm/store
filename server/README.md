@@ -2,11 +2,6 @@
 
 This Express.js application provides a backend API for an e-commerce store with advanced search capabilities, including text-based semantic search and image-based visual search powered by vector embeddings.
 
-## Demo
-
-[visual-search-demo.webm](https://github.com/user-attachments/assets/ec0d0315-f1b7-46dc-875b-a8293bf03280)
-
-
 ## Features
 
 - **Product Management**: CRUD operations for product catalog

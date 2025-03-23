@@ -189,6 +189,6 @@ If image processing fails:
 - Ensure the uploads directory exists and has write permissions
 - Check if Sharp is properly installed
 
-## License
+## Docker result
 
-[MIT License](LICENSE)
+![image](https://github.com/user-attachments/assets/2a12c46c-3a0a-4235-8d01-fc2edc307127)

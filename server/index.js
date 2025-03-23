@@ -7,11 +7,11 @@ const bodyParser = require('body-parser');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 
-// Import routes
-const productRoutes = require('./routes/products');
-
 // Load environment variables
 dotenv.config();
+
+// Import routes
+const productRoutes = require('./routes/products');
 
 // MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -38,9 +38,9 @@ app.use(cors({
 // Request logging
 app.use(morgan('dev'));
 
-// Body parsers
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+// Body parsers with increased limits for image uploads
+app.use(bodyParser.json({ limit: '5mb' }));
+app.use(bodyParser.urlencoded({ limit: '5mb', extended: true }));
 
 // Rate limiting
 const limiter = rateLimit({

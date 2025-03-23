@@ -131,6 +131,66 @@ const ragSearch = async (queryObject) => {
 };
 
 /**
+ * Process image search request
+ * @param {String} base64Image - Base64 encoded image string
+ * @returns {Promise<Array>} - Array of matching products
+ */
+const processImageSearch = async (base64Image) => {
+  try {
+    if (!base64Image) {
+      logger.error("processImageSearch(): No image data provided");
+      return [];
+    }
+
+    logger.info("processImageSearch(): Processing image search request");
+    
+    // Create buffer from base64 string
+    // Remove data URL prefix if present (e.g., data:image/jpeg;base64,)
+    let imageData = base64Image;
+    if (base64Image.includes(',')) {
+      imageData = base64Image.split(',')[1];
+    }
+    
+    const imageBuffer = Buffer.from(imageData, 'base64');
+    
+    // Create and initialize MultimodalProcessor
+    const multimodalProcessor = new MultimodalProcessor();
+    await multimodalProcessor.init();
+    await multimodalProcessor.initializeCollection();
+    
+    // Generate caption for the image
+    const id = `search_${Date.now()}`;
+    const tempFilePath = `/tmp/${id}.jpg`;
+    
+    // Save buffer to temporary file for processing
+    require('fs').writeFileSync(tempFilePath, imageBuffer);
+    
+    // Generate image caption to use for search
+    const imageCaption = await multimodalProcessor.generateCaption(id, tempFilePath);
+    logger.info("processImageSearch(): Generated caption", { caption: imageCaption });
+    
+    // Use RAG search with the generated caption
+    const results = await multimodalProcessor.ragSearch(
+      Product,
+      imageCaption,
+      10
+    );
+    
+    // Clean up temporary file
+    try {
+      require('fs').unlinkSync(tempFilePath);
+    } catch (err) {
+      logger.error("Error cleaning up temp file", err);
+    }
+    
+    return results;
+  } catch (error) {
+    logger.error(`processImageSearch(): Failed to process image search`, error);
+    throw new AppError("Failed to process image search", error.message);
+  }
+};
+
+/**
  * @route   GET /api/products
  * @desc    Get all products with optional filtering
  * @access  Public
@@ -190,6 +250,41 @@ router.get(
     }
   }
 );
+
+/**
+ * @route   POST /api/products/image-search
+ * @desc    Search products using an image
+ * @access  Public
+ */
+router.post("/image-search", async (req, res, next) => {
+  try {
+    const { image } = req.body;
+    
+    if (!image) {
+      return res.status(400).json({
+        success: false,
+        message: "No image data provided"
+      });
+    }
+    
+    const results = await processImageSearch(image);
+    
+    if (!results || results.length === 0) {
+      logger.warn("No results found for image search");
+    } else {
+      logger.success(`Image search returned ${results.length} products`);
+    }
+    
+    res.json(results);
+  } catch (error) {
+    logger.error("Error in image search endpoint:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to process image search",
+      error: process.env.NODE_ENV === "production" ? {} : error.message
+    });
+  }
+});
 
 /**
  * @route   GET /api/products/:id

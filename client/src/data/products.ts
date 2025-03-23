@@ -150,30 +150,25 @@ export const searchProducts = async (query: string): Promise<Product[]> => {
 };
 
 // Image search using the server's RAG functionality
-export const imageSearchProducts = async (image: File): Promise<Product[]> => {
+export const imageSearchProducts = async (base64Image: string): Promise<Product[]> => {
   try {
-    // Create form data for the image upload
-    const formData = new FormData();
-    formData.append('image', image);
+    console.log('Performing image search with base64 data');
     
-    // Set headers for multipart form data
-    const config = {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    };
-    
-    // This endpoint would need to be implemented on the server
+    // Send the base64 image data directly to the server
     const response = await axios.post(
       `${API_URL}/products/image-search`,
-      formData,
-      config
+      { image: base64Image },
+      {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
     );
     
-    // If the image search API isn't ready yet, fallback to a regular search
-    if (!response.data) {
-      console.log('Image search API not available, falling back to regular search');
-      return await ragSearchProducts('clothing'); // Fallback search term
+    // If the API returns no results, fall back to a default search
+    if (!response.data || !Array.isArray(response.data) || response.data.length === 0) {
+      console.log('No image search results, falling back to regular search');
+      return await ragSearchProducts('clothing');
     }
     
     // Map server response to client format
@@ -185,13 +180,12 @@ export const imageSearchProducts = async (image: File): Promise<Product[]> => {
       image: product.image || product.images?.[0] || '',
       category: product.category,
       stock: product.inStock ? (product.rating?.count || 10) : 0,
-      rating: product.rating?.rate || 4.0
+      rating: product.rating?.rate || 4.0,
+      matchType: product._searchMethod || 'visual'
     }));
   } catch (error) {
     console.error('Error in image search:', error);
     // Fallback to provide some results even if the API call fails
-    const allProducts = await fetchProducts();
-    const shuffled = [...allProducts].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, 3);
+    return await fetchProducts();
   }
 };

@@ -154,6 +154,12 @@ export const imageSearchProducts = async (base64Image: string): Promise<Product[
   try {
     console.log('Performing image search with base64 data');
     
+    // Validate image size before sending
+    if (base64Image.length > 2000000) { // ~2MB in base64
+      console.error('Image too large, please use a smaller image');
+      return await ragSearchProducts('clothing');
+    }
+    
     // Send the base64 image data directly to the server
     const response = await axios.post(
       `${API_URL}/products/image-search`,
@@ -165,27 +171,41 @@ export const imageSearchProducts = async (base64Image: string): Promise<Product[
       }
     );
     
-    // If the API returns no results, fall back to a default search
-    if (!response.data || !Array.isArray(response.data) || response.data.length === 0) {
-      console.log('No image search results, falling back to regular search');
-      return await ragSearchProducts('clothing');
+    // Handle response based on structure
+    // If the API returns an object with success and data properties
+    if (response.data && response.data.success && Array.isArray(response.data.data)) {
+      if (response.data.data.length === 0) {
+        console.log('No image search results, falling back to regular search');
+        return await ragSearchProducts('clothing');
+      }
+      return response.data.data.map(mapProductToClientFormat);
     }
     
-    // Map server response to client format
-    return response.data.map((product: any) => ({
-      id: product._id?.toString() || product.sourceId?.toString() || product.id?.toString(),
-      name: product.name,
-      price: product.price,
-      description: product.description || '',
-      image: product.image || product.images?.[0] || '',
-      category: product.category,
-      stock: product.inStock ? (product.rating?.count || 10) : 0,
-      rating: product.rating?.rate || 4.0,
-      matchType: product._searchMethod || 'visual'
-    }));
+    // If the API returns an array directly
+    if (Array.isArray(response.data) && response.data.length > 0) {
+      return response.data.map(mapProductToClientFormat);
+    }
+    
+    // No results found, fallback to text search
+    console.log('No image search results, falling back to regular search');
+    return await ragSearchProducts('clothing');
   } catch (error) {
     console.error('Error in image search:', error);
-    // Fallback to provide some results even if the API call fails
-    return await fetchProducts();
+    // Fallback to a limited set of products rather than all products
+    const allProducts = await fetchProducts();
+    return allProducts.slice(0, 5); // Return just 5 products as fallback
   }
 };
+
+// Helper function to map server product to client format
+const mapProductToClientFormat = (product: any): Product => ({
+  id: product._id?.toString() || product.sourceId?.toString() || product.id?.toString(),
+  name: product.name,
+  price: product.price,
+  description: product.description || '',
+  image: product.image || product.images?.[0] || '',
+  category: product.category,
+  stock: product.inStock ? (product.rating?.count || 10) : 0,
+  rating: product.rating?.rate || 4.0,
+  matchType: product._searchMethod || 'visual'
+});

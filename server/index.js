@@ -38,9 +38,9 @@ app.use(cors({
 // Request logging
 app.use(morgan('dev'));
 
-// Body parsers with increased limits for image uploads
-app.use(bodyParser.json({ limit: '5mb' }));
-app.use(bodyParser.urlencoded({ limit: '5mb', extended: true }));
+// Body parsers with reasonable limits for image uploads
+app.use(bodyParser.json({ limit: '2mb' }));
+app.use(bodyParser.urlencoded({ limit: '2mb', extended: true }));
 
 // Rate limiting
 const limiter = rateLimit({
